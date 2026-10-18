@@ -1,0 +1,21 @@
+Victorious Mesh
+Copyright (c) 2026 Victorious93 / Don Victor
+
+This product is a modified version of tailscale-android
+(https://github.com/tailscale/tailscale-android), and it includes and links
+the tailscale.com Go module (https://github.com/tailscale/tailscale).
+
+  Copyright (c) Tailscale Inc & AUTHORS
+  Licensed under the BSD 3-Clause License; see LICENSE.
+  An additional patent grant applies; see PATENTS.
+
+"Tailscale" is a trademark of Tailscale Inc. Victorious Mesh is not affiliated
+with, sponsored by, or endorsed by Tailscale Inc. Tailscale names and logos have
+been removed from the user interface of this build.
+
+WireGuard is a registered trademark of Jason A. Donenfeld.
+
+Modifications by Victorious Mesh include: rebranding (application id, name,
+icon, theme), a user-configurable Headscale control server, permanently
+disabled upload of diagnostic logs, debug/release signing configuration and a
+reduced set of ABIs.
