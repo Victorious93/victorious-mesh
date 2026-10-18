@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.VictoriousMesh" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#FF121216</item>
-        <item name="android:statusBarColor">#FF121216</item>
-        <item name="android:navigationBarColor">#FF121216</item>
-    </style>
-</resources>
