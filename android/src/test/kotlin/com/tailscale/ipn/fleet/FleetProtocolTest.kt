@@ -196,6 +196,20 @@ class FleetProtocolTest {
     assertTrue(CallerAllowlist.isAllowed(mapOf("other.pkg" to listOf(dca), "ai.droidcommand.app" to listOf("00", dca))))
   }
 
+  private val rel = "9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D"
+
+  @Test
+  fun allowlistPinsBothCertsForBothPackages() {
+    for (pkg in listOf("ai.droidcommand.app", "ai.droidcommand.app.debug")) {
+      assertTrue(CallerAllowlist.isAllowed(mapOf(pkg to listOf(dca))))
+      assertTrue(CallerAllowlist.isAllowed(mapOf(pkg to listOf(rel))))
+      assertTrue(CallerAllowlist.isAllowed(mapOf(pkg to listOf(CallerAllowlist.normalize(rel)))))
+      assertEquals(setOf(CallerAllowlist.normalize(dca), CallerAllowlist.normalize(rel)), CallerAllowlist.ENTRIES[pkg])
+    }
+    assertEquals(2, CallerAllowlist.ENTRIES.size)
+    assertFalse(CallerAllowlist.isAllowed(mapOf("evil.app" to listOf(rel))))
+  }
+
   @Test
   fun allowlistRejects() {
     assertFalse(CallerAllowlist.isAllowed(mapOf("evil.app" to listOf(dca))))

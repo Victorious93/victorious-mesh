@@ -31,11 +31,11 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
   `com.victorious.mesh.action.BRIDGE`.
 - **Protocol:** the shared fleet JSON envelope, `protocol_major` 1.
 - **Pairing:** by package name + signing-certificate SHA-256, checked on this side.
-  There is **no shared signing key**.
-- **Allowlist today:** only the droidcommand-AI **debug** cert
-  (`ai.droidcommand.app` and `ai.droidcommand.app.debug`). The release cert is pending
-  and is not accepted until it's added (see `TODO(release cert)` in
-  `android/src/main/java/com/tailscale/ipn/fleet/FleetProtocol.kt`).
+  Mesh does **not** share a signing key with the controller.
+- **Allowlist:** `ai.droidcommand.app` and `ai.droidcommand.app.debug`, each pinned to
+  two certs: the droidcommand-AI debug cert (`88:00:51:A6:…:A0:C8:4D`) and the shared
+  fleet release cert the controller signs with (`9E:A7:B3:14:…:F7:2D:8D`). Full values in
+  [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md). Mesh's own signing keys are separate.
 - Each install has a permanent node id: `mesh-` + 32 lowercase hex characters.
 
 ### Operations

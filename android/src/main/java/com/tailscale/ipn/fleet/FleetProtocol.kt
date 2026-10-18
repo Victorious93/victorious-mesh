@@ -115,16 +115,17 @@ object CallerAllowlist {
   private const val DCA_DEBUG_CERT =
       "88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D"
 
-  // ===================================================================================
-  // TODO(release cert): droidcommand-AI RELEASE signing cert SHA-256 is TBD per spec.
-  // Do NOT add a guessed value. Once confirmed, add e.g.:
-  //   "ai.droidcommand.app" to setOf(DCA_DEBUG_CERT, DCA_RELEASE_CERT),
-  // ===================================================================================
+  // droidcommand-AI release cert = shared fleet release key (confirmed 2026-10-18).
+  // Mesh's own release key is separate and is NOT this cert.
+  private const val DCA_RELEASE_CERT =
+      "9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D"
+
+  private val DCA_CERTS = setOf(normalize(DCA_DEBUG_CERT), normalize(DCA_RELEASE_CERT))
 
   val ENTRIES: Map<String, Set<String>> =
       mapOf(
-          "ai.droidcommand.app" to setOf(normalize(DCA_DEBUG_CERT)),
-          "ai.droidcommand.app.debug" to setOf(normalize(DCA_DEBUG_CERT)),
+          "ai.droidcommand.app" to DCA_CERTS,
+          "ai.droidcommand.app.debug" to DCA_CERTS,
       )
 
   fun normalize(fp: String) = fp.replace(":", "").replace(" ", "").lowercase()

@@ -18,13 +18,13 @@ Turn the switch off at any time to block the controller again.
 Every request is checked. The calling app must be one of these, signed with the matching
 certificate (SHA-256):
 
-| Package | Signing cert SHA-256 |
+| Package | Allowed signing certs (SHA-256) |
 |---|---|
-| `ai.droidcommand.app` | `88:00:51:A6:…:A0:C8:4D` (debug cert) |
-| `ai.droidcommand.app.debug` | same |
+| `ai.droidcommand.app` | debug `88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D` and release `9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D` |
+| `ai.droidcommand.app.debug` | same two certs |
 
-The release certificate is not known yet and is **not** allowed until it is added in
-`CallerAllowlist` (`FleetProtocol.kt`, marked `TODO(release cert)`).
+The release cert is the shared fleet release key that droidcommand-AI signs with.
+Victorious Mesh itself is signed with its own, separate release key.
 
 ## How it talks
 
