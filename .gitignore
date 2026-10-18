@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.keystore
+# Release keystores must never be committed. Only the fixed debug keystore below is allowed.
+*.jks
+!app/keystore/victorious-mesh-debug.jks
