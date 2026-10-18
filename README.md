@@ -54,8 +54,7 @@ Full details, errors and examples: [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md).
 
 ## Build and run
 
-You need Go (version in `go.mod`), gomobile (installed by the build script)
-[Likely], JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
+You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
 
 ```sh
 export ANDROID_HOME=/path/to/android-sdk
