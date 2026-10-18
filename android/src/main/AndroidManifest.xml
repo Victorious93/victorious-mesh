@@ -133,6 +133,15 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="systemExempted"
             tools:node="merge" />
+        <!-- Victorious Mesh fleet IPC bridge. Exported; every call is checked against a
+             (package, signing-cert SHA-256) allowlist and the in-app toggle (default OFF). -->
+        <service
+            android:name=".fleet.FleetBridgeService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.victorious.mesh.action.BRIDGE" />
+            </intent-filter>
+        </service>
         <service
             android:name=".QuickToggleService"
             android:exported="true"

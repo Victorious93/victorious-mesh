@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -32,6 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tailscale.ipn.BuildConfig
 import com.tailscale.ipn.R
+import com.tailscale.ipn.fleet.FleetSettings
 import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.ShowHide
@@ -130,6 +132,19 @@ fun SettingsView(
         Lists.ItemDivider()
         Setting.Text(R.string.subnet_routing, onClick = settingsNav.onNavigateToSubnetRouting)
       }
+
+      Lists.ItemDivider()
+      val fleetCtx = LocalContext.current
+      var fleetEnabled by remember { mutableStateOf(FleetSettings.isExternalControlEnabled(fleetCtx)) }
+      Setting.Switch(
+          titleRes = R.string.fleet_allow_controller,
+          subtitle = stringResource(R.string.fleet_allow_controller_subtitle),
+          isOn = fleetEnabled,
+          onToggle = {
+            FleetSettings.setExternalControlEnabled(fleetCtx, it)
+            fleetEnabled = it
+          },
+      )
 
       // Victorious Mesh: remote log upload is permanently disabled; toggle removed.
 
