@@ -208,7 +208,8 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
               // If VPN is stopped, show a disconnected notification. If it is running as a
               // foreground
               // service, IPNService will show a connected notification.
-              if (state == Ipn.State.Stopped) {
+              if (state == Ipn.State.Stopped &&
+                  !com.tailscale.ipn.wireguard.WireGuardManager.isWireGuardActive()) {
                 notifyStatus(vpnRunning = false, hideDisconnectAction = hideDisconnectAction.value)
               }
               val vpnRunning = state == Ipn.State.Starting || state == Ipn.State.Running
