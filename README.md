@@ -52,6 +52,35 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 and switch on **Allow fleet controller (droidcommand-AI)**.
 Full details, errors and examples: [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md).
 
+## WireGuard mode
+
+Besides the mesh, the app can run a plain WireGuard tunnel from a standard
+wg-quick `.conf` file (for example one from a VPN provider or your own server).
+
+- **Open it:** Settings → **WireGuard**.
+- **Add a profile:** **Import .conf** (system file picker), **Paste** the config text,
+  or **QR image** (pick a screenshot/photo of a WireGuard QR code). Profiles can be
+  renamed and deleted.
+- **Connect / disconnect:** tap **Connect** on a profile. The card at the top shows the
+  current tunnel mode (Mesh or WireGuard) and whether it is connected.
+- **One tunnel at a time.** Android allows one VPN per app, so the modes are mutually
+  exclusive. Connecting WireGuard turns the mesh off first; turning the mesh on (main
+  screen) turns WireGuard off first. **Switch back to mesh mode** returns to the mesh.
+- **What is used from the config:** `PrivateKey`, `Address`, `DNS` (IPs become DNS
+  servers, names become search domains), `MTU` (default 1280), `ListenPort`, and per
+  peer `PublicKey`, `PresharedKey`, `AllowedIPs` (installed as routes), `Endpoint`
+  (host names are resolved when connecting) and `PersistentKeepalive`. Linux-only
+  wg-quick keys (`PostUp`, `Table`, `FwMark`, ...) are ignored.
+- **Keys:** the whole config, including the private key, is stored only in the app's
+  EncryptedSharedPreferences (AES-256-GCM, master key in the Android Keystore). Keys are
+  never logged and never included in error messages.
+- **Fleet bridge:** no new operations. While WireGuard mode is active, `mesh.status`
+  reports the mesh as down (`connected: false`, no mesh IPs) and `mesh.up` is refused
+  until the user switches back to mesh mode in the app.
+- **How it works:** WireGuard runs inside the app's existing Go core using
+  `github.com/tailscale/wireguard-go` (MIT), on the same VpnService the mesh uses. No
+  second Go runtime and no extra native library is added.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
