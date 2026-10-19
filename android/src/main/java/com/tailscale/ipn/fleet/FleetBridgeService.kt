@@ -50,6 +50,9 @@ object FleetSettings {
 
 /** MeshBackend backed by the in-process Notifier state flows and App start/stop paths. */
 class AppMeshBackend(private val ctx: Context) : MeshBackend {
+  override fun wireGuardModeActive(): Boolean =
+      com.tailscale.ipn.wireguard.WireGuardManager.isWireGuardActive()
+
   override fun status(): MeshStatus {
     val state = Notifier.state.value
     val (v4, v6) = FleetDispatcher.splitAddresses(Notifier.netmap.value?.SelfNode?.Addresses)
