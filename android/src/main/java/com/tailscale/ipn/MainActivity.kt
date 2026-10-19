@@ -337,6 +337,7 @@ class MainActivity : ComponentActivity() {
               val settingsNav =
                   SettingsNav(
                       onNavigateToControlServer = { navController.navigate("controlServer") },
+                      onNavigateToWireGuard = { navController.navigate("wireguard") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -421,6 +422,9 @@ class MainActivity : ComponentActivity() {
               composable("tailnetLock") { TailnetLockSetupView(backTo("settings")) }
               composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }
               composable("about") { AboutView(backTo("settings")) }
+              composable("wireguard") {
+                com.tailscale.ipn.ui.view.WireGuardView(backTo("settings"))
+              }
               composable("controlServer") {
                 ControlServerView(
                     onBack = backTo("settings"),

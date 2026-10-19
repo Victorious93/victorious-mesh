@@ -412,6 +412,8 @@
     <string name="vm_control_server_port_warning">Warning: this URL is not on port 443. Use https:// on port 443.</string>
     <string name="vm_login_with_preauth_key">Log in with a pre-auth key</string>
     <string name="vm_login_with_preauth_key_desc">Join using a key from: headscale preauthkeys create --user USER</string>
+    <string name="wireguard_title">WireGuard</string>
+    <string name="wireguard_settings_subtitle">Use a standard WireGuard tunnel instead of the mesh</string>
     <string name="fleet_allow_controller">Allow fleet controller (droidcommand-AI)</string>
     <string name="fleet_allow_controller_subtitle">Lets the signed droidcommand-AI app check status and turn the mesh on or off</string>
 </resources>

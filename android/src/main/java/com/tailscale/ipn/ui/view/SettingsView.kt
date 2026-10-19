@@ -112,6 +112,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.wireguard_title,
+          subtitle = stringResource(R.string.wireguard_settings_subtitle),
+          onClick = settingsNav.onNavigateToWireGuard,
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.split_tunneling,
           subtitle = stringResource(R.string.filter_apps_allowed_to_access_tailscale),
           onClick = settingsNav.onNavigateToSplitTunneling,
