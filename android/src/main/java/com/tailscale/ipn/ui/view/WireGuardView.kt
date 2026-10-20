@@ -52,7 +52,7 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.util.TSLog
 import com.tailscale.ipn.wireguard.TunnelMode
 import com.tailscale.ipn.wireguard.WireGuardManager

@@ -24,6 +24,8 @@ import kotlinx.serialization.json.putJsonArray
 object FleetProtocol {
   const val PROTOCOL_MAJOR = 1
   const val PROTOCOL_MINOR = 1
+  // Frozen intent action. Do not derive from applicationId: debug builds
+  // use applicationIdSuffix ".debug" and would otherwise change the action.
   const val ACTION_BRIDGE = "com.victorious.mesh.action.BRIDGE"
   const val MSG_REQUEST = 1
   const val MSG_RESPONSE = 2

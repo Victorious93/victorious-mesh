@@ -31,8 +31,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tailscale.ipn.BuildConfig
-import com.tailscale.ipn.R
+import com.victorious.mesh.BuildConfig
+import com.victorious.mesh.R
 import com.tailscale.ipn.fleet.FleetSettings
 import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
 import com.tailscale.ipn.mdm.MDMSettings

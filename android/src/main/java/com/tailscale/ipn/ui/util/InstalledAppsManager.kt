@@ -6,7 +6,7 @@ package com.tailscale.ipn.ui.util
 import android.Manifest
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import com.tailscale.ipn.BuildConfig
+import com.victorious.mesh.BuildConfig
 
 data class InstalledApp(val name: String, val packageName: String)
 

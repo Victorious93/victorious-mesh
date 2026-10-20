@@ -53,7 +53,7 @@ import com.patrykandpatrick.vico.core.axis.AxisItemPlacer
 import com.patrykandpatrick.vico.core.chart.copy
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 import com.patrykandpatrick.vico.core.entry.entryModelOf
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.model.Tailcfg
 import com.tailscale.ipn.ui.util.ConnectionMode
 import com.tailscale.ipn.ui.viewModel.PingViewModel

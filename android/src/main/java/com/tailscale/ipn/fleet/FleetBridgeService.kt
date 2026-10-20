@@ -26,7 +26,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.tailscale.ipn.App
 import com.tailscale.ipn.MainActivity
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.UninitializedApp
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier

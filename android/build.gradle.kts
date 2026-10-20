@@ -87,7 +87,9 @@ android {
   }
 
   flavorDimensions += "version"
-  namespace = "com.tailscale.ipn"
+  // R / BuildConfig live here. Kotlin sources stay in com.tailscale.ipn
+  // (gomobile libtailscale + upstream-merge deferral; see README).
+  namespace = "com.victorious.mesh"
 
   // JVM unit tests: static File, not a Provider (AGP 9 rejects Provider srcDir).
   sourceSets {
@@ -120,6 +122,9 @@ android {
     debug {
       manifestPlaceholders["leanbackRequired"] = isTV()
       signingConfig = signingConfigs.getByName("debug")
+      // Install id becomes com.victorious.mesh.debug so a debug APK can
+      // sit next to the release app. applicationId itself is never changed.
+      applicationIdSuffix = ".debug"
     }
 
     release {
