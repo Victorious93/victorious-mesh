@@ -61,7 +61,7 @@ import com.tailscale.ipn.wireguard.WireGuardProfileStore
 import java.io.ByteArrayOutputStream
 import libtailscale.Libtailscale
 
-private const val TAG = "WireGuardView"
+private const val WG_VIEW_TAG = "WireGuardView"
 private const val MAX_CONF_BYTES = 64 * 1024
 
 /** Validates via the Go parser; returns an error message or null. Never echoes the config. */
@@ -276,7 +276,7 @@ fun WireGuardView(onBack: () -> Unit) {
                 store.delete(p.id)
                 refresh()
                 deleting = null
-                TSLog.d(TAG, "profile deleted")
+                TSLog.d(WG_VIEW_TAG, "profile deleted")
               }) {
                 Text("Delete", color = MaterialTheme.colorScheme.error)
               }
