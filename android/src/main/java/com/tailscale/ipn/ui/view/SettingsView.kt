@@ -159,6 +159,15 @@ fun SettingsView(
           onClick = settingsNav.onNavigateToVictorGps,
       )
 
+      if (!isAndroidTV()) {
+        Lists.ItemDivider()
+        Setting.Text(
+            R.string.extratiles_title,
+            subtitle = stringResource(R.string.extratiles_settings_subtitle),
+            onClick = settingsNav.onNavigateToTilesWidget,
+        )
+      }
+
       Lists.ItemDivider()
       Setting.Text(
           R.string.split_tunneling,

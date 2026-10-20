@@ -211,6 +211,15 @@ not mock GPS. `com.victorious.gps` is **not** on the fleet allowlist.
 Debug cert SHA-256 recorded from victorgps PR #1; release TBD. No new
 fleet operations.
 
+## Tiles & widget
+
+**Settings → Tiles & widget.** Off by default. **[not device-verified]**
+
+The original Quick Settings tile still toggles the VPN. This switch
+offers a kill-switch tile, a mesh-proxy tile, a status tile, and a
+home-screen widget. You still add them from Quick Settings or the
+widget picker. No new fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

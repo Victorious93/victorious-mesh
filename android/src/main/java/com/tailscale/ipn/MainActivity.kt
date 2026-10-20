@@ -101,6 +101,7 @@ import com.tailscale.ipn.ui.view.UserSwitcherView
 import com.tailscale.ipn.autoconnect.AutoConnectController
 import com.tailscale.ipn.autoconnect.AutoConnectEvent
 import com.tailscale.ipn.ui.view.AutoConnectView
+import com.tailscale.ipn.ui.view.ExtraTilesView
 import com.tailscale.ipn.ui.view.KillSwitchView
 import com.tailscale.ipn.ui.view.LeakCheckerView
 import com.tailscale.ipn.ui.view.VictorGpsView
@@ -358,6 +359,7 @@ class MainActivity : ComponentActivity() {
                       onNavigateToAutoConnect = { navController.navigate("autoConnect") },
                       onNavigateToLeakChecker = { navController.navigate("leakChecker") },
                       onNavigateToVictorGps = { navController.navigate("victorGps") },
+                      onNavigateToTilesWidget = { navController.navigate("tilesWidget") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -450,6 +452,7 @@ class MainActivity : ComponentActivity() {
               composable("autoConnect") { AutoConnectView(backTo("settings")) }
               composable("leakChecker") { LeakCheckerView(backTo("settings")) }
               composable("victorGps") { VictorGpsView(backTo("settings")) }
+              composable("tilesWidget") { ExtraTilesView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(

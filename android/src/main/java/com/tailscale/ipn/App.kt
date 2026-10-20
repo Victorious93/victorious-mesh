@@ -42,6 +42,7 @@ import com.tailscale.ipn.util.FeatureFlags
 import com.tailscale.ipn.util.HardwareKeyStore
 import com.tailscale.ipn.util.NoSuchKeyException
 import com.tailscale.ipn.util.ShareFileHelper
+import com.tailscale.ipn.tiles.ExtraTilesController
 import com.tailscale.ipn.util.TSLog
 import com.tailscale.ipn.wireguard.WireGuardManager
 import java.io.IOException
@@ -192,6 +193,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
     connectivityManager = this.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     NetworkChangeCallback.monitorDnsChanges(connectivityManager, dns)
     initViewModels()
+    runCatching { ExtraTilesController.sync(this) }
     applicationScope.launch {
       val restrictionsManager =
           getSystemService(Context.RESTRICTIONS_SERVICE) as RestrictionsManager
@@ -218,6 +220,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
               val vpnRunning = state == Ipn.State.Starting || state == Ipn.State.Running
               updateConnStatus(ableToStartVPN)
               QuickToggleService.setVPNRunning(vpnRunning)
+              runCatching { ExtraTilesController.refreshSurfaces(this@App) }
               // Update notification status when VPN is running
               if (vpnRunning) {
                 notifyStatus(
