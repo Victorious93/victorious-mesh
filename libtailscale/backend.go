@@ -338,6 +338,7 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 		SetBoth:           b.setCfg,
 		GetBaseConfigFunc: b.getDNSBaseConfig,
 	}
+	forcedReconfigure = vf.ReconfigureVPN
 	engine, err := wgengine.NewUserspaceEngine(logf, wgengine.Config{
 		Tun:            b.devices,
 		Router:         vf,

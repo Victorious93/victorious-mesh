@@ -170,9 +170,11 @@ This is the other direction: apps on this phone would send internet traffic thro
 - **HTTP on Android 10 and newer:** the VPN tells Android about that proxy (`VpnService.Builder.setHttpProxy`). That is **advisory**. Apps that ignore the system HTTP proxy do **not** go through it.
 - Username and password for an upstream proxy are stored encrypted, but Android's API has **no credential field**, so they cannot be applied.
 - If the proxy host is a **literal public or LAN IP**, Android 13+ excludes that IP from the VPN so the phone can still reach the proxy on Wi‑Fi or cellular (avoids a routing loop). A **hostname** cannot be excluded that way. A **mesh IP** upstream is left inside the VPN on purpose.
-- **SOCKS5:** settings are saved only. Android has no all-app SOCKS5 API on the VPN builder. Rewriting every socket through SOCKS5 in the mesh engine is out of scope.
+- **SOCKS5 (advisory):** settings are saved only unless you turn on **Force all traffic**.
+- **Force all traffic (off by default):** the mesh engine sends app TCP from the VPN through the proxy (HTTP CONNECT or SOCKS5) and applies username/password. UDP uses SOCKS5 UDP ASSOCIATE when the proxy supports it; otherwise UDP is blocked. Mesh `100.x` / `fd7a:…` addresses stay on the mesh. The proxy host is excluded from the VPN so the phone can still reach it (loop prevention). **[not device-verified]**
+- **Fail closed (off by default):** if the proxy is down, those flows are blocked instead of going around it.
 
-**Leak limit — this cannot promise no leak.** `setHttpProxy` is advisory. Apps that do not honor it send traffic through the VPN (or the underlay) without the proxy. SOCKS5 cannot be applied to every app. After you change these settings, disconnect and reconnect the mesh.
+**Gaps that remain.** System DNS may still use the mesh or platform resolver and is not rewritten through the proxy. IPv6 is captured when forced is on but many HTTP proxies are IPv4-only, so IPv6 flows fail closed. ICMP cannot go through SOCKS/CONNECT and is dropped. Apps set to **Direct** in Per-app routing skip the VPN and this path. WireGuard mode does not use the forced path. After you change these settings, disconnect and reconnect the mesh.
 
 ### Per-app routing
 
@@ -404,7 +406,7 @@ under **Settings → WireGuard**.
 
 **The mesh proxy will not start.** Connect the mesh first (not WireGuard). The listener needs this phone's `100.x` address. Check the port is 1024–65535, and that username and password are both set or both empty. **[not device-verified]**
 
-**Internet still bypasses my upstream proxy.** HTTP upstream is advisory (Android 10+). Apps may ignore it, so leaks are possible. SOCKS5 cannot be applied to every app. This is not a leak-proof upstream. See **Settings → Proxy**.
+**Internet still bypasses my upstream proxy.** Advisory HTTP (Android 10+) is not forced. Turn on **Force all traffic** to send VPN TCP through the proxy. UDP still needs SOCKS5 UDP ASSOCIATE. DNS, IPv6, ICMP, Direct apps, and WireGuard mode are documented gaps. See **Settings → Proxy**.
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 

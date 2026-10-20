@@ -438,7 +438,11 @@
     <string name="proxy_password_optional">Password (optional)</string>
     <string name="proxy_save_auth">Save username and password</string>
     <string name="proxy_upstream_heading">Send this phone through a proxy</string>
-    <string name="proxy_upstream_body">HTTP on Android 10+ is advisory: apps may ignore it, so leaks are possible. SOCKS5 cannot be applied to every app. Reconnect the mesh after changing this.</string>
+    <string name="proxy_upstream_body">Off by default. Advisory HTTP (Android 10+) asks apps to use the proxy; they may ignore it. Turn on Force all traffic to send TCP through the proxy from the mesh engine (SOCKS5 UDP ASSOCIATE when the proxy supports it). Reconnect the mesh after changing this.</string>
+    <string name="proxy_forced_enable">Force all traffic through this proxy</string>
+    <string name="proxy_forced_body">Off by default. App TCP in the VPN is sent through the proxy with credentials. UDP uses SOCKS5 UDP ASSOCIATE or is blocked. Mesh addresses stay on the mesh.</string>
+    <string name="proxy_fail_closed">Fail closed</string>
+    <string name="proxy_fail_closed_body">If the proxy drops, block those flows instead of sending them around it. ICMP and IPv6-only paths that the proxy cannot carry are still dropped.</string>
     <string name="proxy_upstream_host">Proxy host</string>
     <string name="proxy_save_upstream">Save upstream proxy</string>
     <string name="proxy_kind_none">Off</string>

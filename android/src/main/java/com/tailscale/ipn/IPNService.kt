@@ -339,8 +339,10 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   private fun refreshMeshProxy() {
     if (WireGuardManager.isWireGuardActive()) {
       MeshProxyController.stop(this)
+      MeshProxyController.clearForced()
     } else {
       MeshProxyController.sync(this)
+      MeshProxyController.syncForced(this)
     }
   }
 
@@ -353,7 +355,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
   private fun applyOutboundHttpProxy(b: Builder) {
     val cfg = MeshProxyController.store(this).upstream()
-    val plan = ProxyPlanner.planOutbound(cfg.kind, cfg.host, cfg.port, Build.VERSION.SDK_INT)
+    val plan = ProxyPlanner.planOutbound(cfg.kind, cfg.host, cfg.port, Build.VERSION.SDK_INT, cfg.forced)
     if (!plan.applyHttpProxy) {
       TSLog.d(TAG, "outbound proxy: ${plan.reason}")
       return
