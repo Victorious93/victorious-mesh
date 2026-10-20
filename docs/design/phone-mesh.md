@@ -1,8 +1,53 @@
 # Phone mesh (design)
 
-This file is the queued design note for phone Wi-Fi mesh (offline mesh,
-offline chat/files, hotspot). The feasibility write-up and the three
-follow-up PRs are **not started**.
+This file is the queued design note for phone Wi-Fi mesh. The full
+feasibility write-up and the three follow-up PRs are **not started**.
+Write feasibility here first; then:
+
+1. Offline mesh
+2. Offline chat / files
+3. Hotspot sharing (TetherFi-style — see below)
+
+Current order before this work: #16 forced upstream, Batch 1, true
+per-app exit/upstream (UID in Go netstack), Batch 2, then this file,
+then ESP32.
+
+## Part 3 — hotspot sharing (queued; TetherFi-style)
+
+Don: fold TetherFi-style features into phone-mesh **part 3**, not a
+separate product. **Cover feasibility in this doc first. Do not
+implement yet.**
+
+Intended scope (all **off by default**):
+
+- No-root **Wi-Fi Direct group** hotspot with a user-set SSID,
+  passphrase, and band.
+- Built-in **HTTP CONNECT + SOCKS5** proxy on the group interface so
+  clients share either the **normal internet** or the **private mesh**
+  (user-selectable). Reuse #12 mesh-proxy code (`libtailscale/meshproxy`,
+  `proxymux.SplitSOCKSAndHTTP`, EncryptedSharedPreferences auth). Do not
+  invent a second proxy stack.
+- Connected-client list with **block / allow**.
+- Optional **wake lock / keep-alive**.
+- A **Quick Settings tile**.
+- Optional **hide Wi-Fi** (hidden SSID). Off by default. Feasibility
+  must verify whether a non-system app can hide the SSID of a Wi-Fi
+  Direct group or `startLocalOnlyHotspot` (**expected: no**). If not,
+  implement the fallback: an innocuous / randomized network name,
+  rotating passphrase, and a **MAC allowlist** (only allowed devices
+  can join). Disclose the limit in the UI, MANUAL, and Help.
+- Disclose **carrier and Android limits** (tethering entitlement,
+  Wi-Fi Direct vs local-only hotspot, OEM differences, no promise of
+  a system-wide SoftAP, likely no hidden SSID).
+- MANUAL + Help. **[not device-verified]** until a phone is checked.
+
+Feasibility must answer: Wi-Fi Direct group owner vs
+`WifiManager.startLocalOnlyHotspot` vs tether AP; whether the group
+interface can bind #12’s listeners without `0.0.0.0`; how mesh vs
+underlay egress is chosen; client block/allow APIs; whether a
+non-system app can hide SSID (and the randomized-name + rotating
+passphrase + MAC-allowlist fallback if not); and what fails on
+carrier-locked devices.
 
 ## ESP32 relay nodes (placeholder)
 
