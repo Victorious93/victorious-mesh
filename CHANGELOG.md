@@ -11,6 +11,10 @@
   `tailscale.version`) — an allowed fork exception, documented in README.
 
 ### Added
+- Fleet `node.status.get` (STATUS-TRAY): `NodeStatusSnapshot` with mesh / vpn /
+  node_health. Advertised on `capabilities.get`. Same v1.1 envelope auth,
+  replay, and expiry as remote control. Down services still answer `ok` with
+  `state: down`. WireGuard mode reports mesh down and vpn up.
 - **WireGuard tunnel mode.** Import a wg-quick `.conf` (file, paste or QR image), manage
   profiles (rename/delete), and connect a standard WireGuard tunnel instead of the mesh.
   Mesh and WireGuard are mutually exclusive on the app's single VpnService. Configs and

@@ -1,8 +1,9 @@
 # Fleet bridge (droidcommand-AI control)
 
 Victorious Mesh can be controlled by the fleet controller app **droidcommand-AI**
-(`ai.droidcommand.app`). The controller can check the mesh status, read this phone's
-mesh IP addresses, and turn the mesh on or off.
+(`ai.droidcommand.app`). The controller can check the mesh status, read a
+status-tray snapshot (`node.status.get`), read this phone's mesh IP addresses,
+and turn the mesh on or off.
 
 Transport is unchanged from v1.0. Protocol version is **major 1, minor 1**.
 Minor 1 adds the FROZEN remote-control envelope (`capabilities.get`,
@@ -82,6 +83,7 @@ Still accepted. `parameters` must be `{}`.
 | `mesh.up` | Turns the mesh on | `requested: "up"` (the start is asynchronous; poll `mesh.status`). Refused if WireGuard mode is active. |
 | `mesh.down` | Turns the mesh off | `requested: "down"`. No-op if WireGuard mode is already active (the mesh is already down). Legacy `mesh.down` still runs immediately (backward compatible). The same action via `remote.command` is gated (see below). |
 | `mesh.ip.get` | This phone's mesh addresses | `ipv4`, `ipv6` (null if not connected) |
+| `node.status.get` | Status-tray snapshot for this node | `NodeStatusSnapshot` (see below). Optional `parameters.args.nodeId`. |
 
 ## Remote-control envelope v1.1
 
@@ -131,6 +133,7 @@ and is bounded (oldest entries evicted first).
 | `mesh.capabilities.get` | `read` | true | false |
 | `mesh.status` | `read` | true | false |
 | `mesh.ip.get` | `read` | true | false |
+| `node.status.get` | `read` | true | false |
 | `mesh.up` | `action` | true | false |
 | `mesh.down` | `destructive` | true | true |
 
@@ -147,12 +150,50 @@ Deny **on this phone**. Nothing auto-approves a remote trigger — not
 If notification permission is denied, the request is still
 `confirmation_required` (never silently run).
 
+### `node.status.get` (status tray)
+
+Frozen STATUS-TRAY snapshot (`STATUS_TRAY.md`). Dispatch via
+`remote.command` (`actionRef: node.status.get`) or legacy
+`operation: node.status.get`. Same envelope auth (package+cert only),
+replay, and expiry as the other remote-control actions.
+
+On success `result` is one camelCase `NodeStatusSnapshot`:
+
+```json
+{
+  "nodeId": "mesh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "packageName": "com.victorious.mesh",
+  "connectionClass": "EXTERNAL_NODE",
+  "updatedAtMs": 1760920000000,
+  "domains": [
+    { "name": "mesh", "state": "ok", "detail": "headscale up" },
+    { "name": "vpn", "state": "ok", "detail": "mesh tunnel up" },
+    { "name": "node_health", "state": "ok" }
+  ]
+}
+```
+
+This node always returns **mesh**, **vpn**, and **node_health**. `state` is
+`ok` | `degraded` | `down` | `unknown` | `off`. `detail` is optional, at
+most 200 characters, and must not contain secrets, keys, IPs, or personal
+data — the codec refuses (`invalid_parameters`) rather than silently
+stripping. A down mesh or tunnel still answers `ok: true` with
+`state: "down"` (that is data, not an error).
+
+Optional `params.args.nodeId`: omit or match this node; a well-formed id
+for another node is `not_found`; blank or malformed is
+`invalid_parameters`.
+
+**[not device-verified]** Snapshot contents on a real phone have not been
+checked.
+
 ### WireGuard mode
 
 Unchanged: while a WireGuard profile is connected, `mesh.status` /
 `mesh.ip.get` (and the same actions via `remote.command`) report the mesh down,
 and `mesh.up` is refused (`safety_refused`). `mesh.down` does not tear the
-WireGuard tunnel down.
+WireGuard tunnel down. `node.status.get` reports `mesh` as `down` and
+`vpn` as `ok` ("WireGuard up") while that tunnel is active.
 
 ## Errors
 

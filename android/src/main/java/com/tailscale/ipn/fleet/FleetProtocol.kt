@@ -1,7 +1,7 @@
 // Victorious Mesh
 // Fleet IPC bridge: pure-Kotlin protocol core (no Android deps, JVM unit-testable).
 // Spec: EXTERNAL_NODE mesh.* ops (2026-10-18) + FROZEN remote-control envelope v1
-// (BRIDGE_PROTOCOL_MAJOR=1, MINOR=1).
+// (BRIDGE_PROTOCOL_MAJOR=1, MINOR=1) + STATUS-TRAY node.status.get (droidcommand-AI #235).
 
 package com.tailscale.ipn.fleet
 
@@ -17,6 +17,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -40,7 +43,8 @@ object FleetProtocol {
   const val OP_UP = "mesh.up"
   const val OP_DOWN = "mesh.down"
   const val OP_IP_GET = "mesh.ip.get"
-  val OPERATIONS = listOf(OP_CAPABILITIES, OP_STATUS, OP_UP, OP_DOWN, OP_IP_GET)
+  const val OP_NODE_STATUS = "node.status.get"
+  val OPERATIONS = listOf(OP_CAPABILITIES, OP_STATUS, OP_UP, OP_DOWN, OP_IP_GET, OP_NODE_STATUS)
 
   const val OP_REMOTE_CAPABILITIES = "capabilities.get"
   const val OP_REMOTE_COMMAND = "remote.command"
@@ -218,6 +222,7 @@ data class RemoteCapability(
             RemoteCapability(FleetProtocol.OP_CAPABILITIES, FleetProtocol.KIND_READ, true, false),
             RemoteCapability(FleetProtocol.OP_STATUS, FleetProtocol.KIND_READ, true, false),
             RemoteCapability(FleetProtocol.OP_IP_GET, FleetProtocol.KIND_READ, true, false),
+            RemoteCapability(FleetProtocol.OP_NODE_STATUS, FleetProtocol.KIND_READ, true, false),
             RemoteCapability(FleetProtocol.OP_UP, FleetProtocol.KIND_ACTION, true, false),
             RemoteCapability(FleetProtocol.OP_DOWN, FleetProtocol.KIND_DESTRUCTIVE, true, true),
         )
@@ -418,6 +423,7 @@ class FleetDispatcher(
     private val capabilities: List<RemoteCapability> = RemoteCapability.DEFAULTS,
     private val knownNodeRefs: Set<String>? = null,
     private val pairing: NodePairing = NodePairing { _, target -> target == nodeId },
+    private val packageName: String = NodeStatusSnapshot.PACKAGE_VICTORIOUS_MESH,
 ) {
 
   fun handle(
@@ -481,12 +487,14 @@ class FleetDispatcher(
     return try {
       if (req.operation !in FleetProtocol.OPERATIONS)
           return err(req.requestId, ErrorCategory.UNSUPPORTED_OPERATION, "unsupported operation")
-      if (req.parameters.isNotEmpty())
+      if (req.parameters.isNotEmpty() && req.operation != FleetProtocol.OP_NODE_STATUS)
           throw InvalidParametersException("operation ${req.operation} takes no parameters")
       if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
-      ok(req.requestId, runMeshAction(req.operation))
+      ok(req.requestId, runMeshAction(req.operation, req.parameters))
     } catch (e: InvalidParametersException) {
       err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
     } catch (e: SafetyRefused) {
       err(req.requestId, ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
     } catch (e: Exception) {
@@ -554,6 +562,8 @@ class FleetDispatcher(
       }
     } catch (e: InvalidParametersException) {
       err(env.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      err(env.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
     } catch (e: SafetyRefused) {
       err(env.requestId, ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
     } catch (e: Exception) {
@@ -569,9 +579,12 @@ class FleetDispatcher(
   ): BridgeResponse {
     if (env.actionRef.isBlank())
         throw InvalidParametersException("actionRef must be non-empty")
-    if (env.params.isNotEmpty())
+    if (env.params.isNotEmpty() && env.actionRef != FleetProtocol.OP_NODE_STATUS)
         throw InvalidParametersException("operation ${env.actionRef} takes no parameters")
-    return outcomeToResponse(env.requestId, executeAction(env.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = true))
+    return outcomeToResponse(
+        env.requestId,
+        executeAction(env.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = true, params = env.params),
+    )
   }
 
   private fun dispatchMacroStep(
@@ -589,9 +602,18 @@ class FleetDispatcher(
     if (onError != FleetProtocol.ON_ERROR_ABORT && onError != FleetProtocol.ON_ERROR_CONTINUE)
         throw InvalidParametersException("onError must be abort or continue")
     if (env.actionRef.isBlank()) throw InvalidParametersException("actionRef must be non-empty")
-    if (env.params.isNotEmpty())
+    if (env.params.isNotEmpty() && env.actionRef != FleetProtocol.OP_NODE_STATUS)
         throw InvalidParametersException("operation ${env.actionRef} takes no parameters")
-    val outcome = executeAction(env.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = true)
+    val outcome =
+        executeAction(
+            env.actionRef,
+            env.requestId,
+            sourceNodeRef,
+            ttl,
+            now,
+            execute = true,
+            params = env.params,
+        )
     val result =
         buildJsonObject {
           put("macroId", macroId)
@@ -628,12 +650,20 @@ class FleetDispatcher(
     var aborted = false
     for ((index, step) in steps.withIndex()) {
       if (step.actionRef.isBlank()) throw InvalidParametersException("steps[$index].actionRef must be non-empty")
-      if (step.params.isNotEmpty())
+      if (step.params.isNotEmpty() && step.actionRef != FleetProtocol.OP_NODE_STATUS)
           throw InvalidParametersException("operation ${step.actionRef} takes no parameters")
       if (step.onError != FleetProtocol.ON_ERROR_ABORT && step.onError != FleetProtocol.ON_ERROR_CONTINUE)
           throw InvalidParametersException("steps[$index].onError must be abort or continue")
       val outcome =
-          executeAction(step.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = execute)
+          executeAction(
+              step.actionRef,
+              env.requestId,
+              sourceNodeRef,
+              ttl,
+              now,
+              execute = execute,
+              params = step.params,
+          )
       stepResults.add(
           buildJsonObject {
             put("stepIndex", index)
@@ -676,6 +706,7 @@ class FleetDispatcher(
       ttl: Long,
       now: Long,
       execute: Boolean,
+      params: JsonObject = JsonObject(emptyMap()),
   ): ActionOutcome {
     val cap = capabilities.find { it.name == actionRef }
     if (cap == null) return ActionOutcome.Err(ErrorCategory.NOT_FOUND, "unknown actionRef $actionRef")
@@ -708,9 +739,11 @@ class FleetDispatcher(
       return ActionOutcome.Ok(buildJsonObject { put("validated", true); put("actionRef", actionRef) })
     }
     return try {
-      ActionOutcome.Ok(runMeshAction(actionRef))
+      ActionOutcome.Ok(runMeshAction(actionRef, params))
     } catch (e: InvalidParametersException) {
       ActionOutcome.Err(ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      ActionOutcome.Err(ErrorCategory.NOT_FOUND, e.message ?: "not found")
     } catch (e: SafetyRefused) {
       ActionOutcome.Err(ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
     } catch (e: Exception) {
@@ -744,7 +777,9 @@ class FleetDispatcher(
 
   private class SafetyRefused(msg: String) : Exception(msg)
 
-  private fun runMeshAction(op: String): JsonObject =
+  private class ActionNotFound(msg: String) : Exception(msg)
+
+  private fun runMeshAction(op: String, params: JsonObject = JsonObject(emptyMap())): JsonObject =
       when (op) {
         FleetProtocol.OP_CAPABILITIES ->
             buildJsonObject {
@@ -790,8 +825,48 @@ class FleetDispatcher(
             put("ipv6", s.ipv6)
           }
         }
+        FleetProtocol.OP_NODE_STATUS -> nodeStatusResult(params)
         else -> throw InvalidParametersException("unsupported mesh action $op")
       }
+
+  private fun nodeStatusResult(params: JsonObject): JsonObject {
+    resolveStatusTarget(params)
+    val status =
+        try {
+          backend.status()
+        } catch (_: Exception) {
+          null
+        }
+    val snapshot =
+        NodeStatusBuilder.fromMesh(
+            nodeId = nodeId,
+            packageName = packageName,
+            status = status,
+            wireGuardActive = backend.wireGuardModeActive(),
+            vpnConsentGranted = backend.vpnConsentGranted(),
+            updatedAtMs = clock(),
+        )
+    return NodeStatusSnapshotCodec.encode(snapshot)
+  }
+
+  /** Empty args = this node. Optional args.nodeId must match this install. */
+  private fun resolveStatusTarget(params: JsonObject) {
+    if (params.isEmpty()) return
+    if (params.keys != setOf("args")) {
+      throw InvalidParametersException("node.status.get accepts only optional args.nodeId")
+    }
+    val argsEl = params["args"] ?: return
+    val args = argsEl as? JsonObject ?: throw InvalidParametersException("args must be an object")
+    if (args.isEmpty()) return
+    if (args.keys != setOf("nodeId")) {
+      throw InvalidParametersException("node.status.get args accepts only nodeId")
+    }
+    val asked = args["nodeId"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+    if (asked.isBlank() || !FleetProtocol.isValidNodeId(asked)) {
+      throw InvalidParametersException("args.nodeId is blank or malformed")
+    }
+    if (asked != nodeId) throw ActionNotFound("args.nodeId does not match this node")
+  }
 
   private fun ok(id: String?, result: JsonObject) =
       BridgeResponse(requestId = id, nodeId = nodeId, ok = true, result = result)
