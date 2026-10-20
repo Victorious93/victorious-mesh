@@ -15,6 +15,10 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **VictorGPS stub (Settings → VictorGPS stub).** Off by default. Local
+  room profile (lat/lng + optional target-app package). Does not mock
+  GPS and is not added to the fleet allowlist. Debug cert recorded
+  from victorgps PR #1. No new fleet ops. **[not device-verified]**
 - **Leak checker (Settings → Leak checker).** Off by default (on-demand
   only). Reports VPN up/down, kill switch, Direct apps, mesh DNS, and
   a public IP from the per-app endpoint. Cannot test other apps,

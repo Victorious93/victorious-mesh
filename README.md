@@ -179,6 +179,15 @@ public IP from the Per-app routing endpoint. Cannot prove other apps
 are leak-free. WebRTC/STUN and pre-VPN sockets are out of scope. No
 new fleet operations.
 
+## VictorGPS stub
+
+**Settings → VictorGPS stub.** Off by default. **[not device-verified]**
+
+Local room profile only (lat/lng + optional target-app package). Does
+not mock GPS. `com.victorious.gps` is **not** on the fleet allowlist.
+Debug cert SHA-256 recorded from victorgps PR #1; release TBD. No new
+fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
