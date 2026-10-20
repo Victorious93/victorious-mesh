@@ -169,6 +169,16 @@ app opens or the phone finishes booting, if VPN permission was already
 granted. Android 12+ may block a start from boot. Always-on VPN is
 more reliable. No start before first unlock. No new fleet operations.
 
+## Leak checker
+
+**Settings → Leak checker.** Off by default (on-demand only).
+**[not device-verified]**
+
+Reports this app's VPN, kill switch, Direct-app count, mesh DNS, and a
+public IP from the Per-app routing endpoint. Cannot prove other apps
+are leak-free. WebRTC/STUN and pre-VPN sockets are out of scope. No
+new fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

@@ -33,6 +33,7 @@ data class SettingsNav(
     val onNavigateToPerAppRouting: () -> Unit = {},
     val onNavigateToKillSwitch: () -> Unit = {},
     val onNavigateToAutoConnect: () -> Unit = {},
+    val onNavigateToLeakChecker: () -> Unit = {},
 )
 
 class SettingsViewModel : IpnViewModel() {

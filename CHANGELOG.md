@@ -15,6 +15,11 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Leak checker (Settings → Leak checker).** Off by default (on-demand
+  only). Reports VPN up/down, kill switch, Direct apps, mesh DNS, and
+  a public IP from the per-app endpoint. Cannot test other apps,
+  WebRTC/STUN, or pre-VPN sockets. No new fleet ops.
+  **[not device-verified]**
 - **Auto-connect (Settings → Auto-connect).** Off by default. Starts
   the last mesh or WireGuard tunnel on app open and after boot when
   VPN permission is already granted. Android 12+ may block boot

@@ -231,6 +231,26 @@ When this is on, the last tunnel mode (mesh, or the last WireGuard profile) star
 
 **Limits.** Android 12 and newer may block a start from boot. **Always-on VPN** in Android settings is more reliable for that. This does not start before the first unlock. It does not start if you have never granted VPN permission (`isAbleToStartVPN` is false). Turning the main switch off still disconnects; the next app open or reboot will start again while this setting is on. There is **no fleet operation** for this.
 
+### Leak checker
+
+![Leak checker](images/manual/leak-checker.png)
+
+*Screenshot pending.*
+
+**Settings → Leak checker**
+
+**Off by default** — nothing runs until you tap **Run check**. **[not device-verified]**
+
+The report covers this app only:
+
+1. Whether the VPN is up.
+2. Whether the kill switch is on.
+3. How many apps are set to **Direct** (those skip the tunnel on purpose).
+4. Mesh DNS on or off.
+5. A public IP from the URL in **Settings → Per-app routing** (this app's path, not another app's).
+
+**Limits.** This cannot prove other apps are leak-free. WebRTC/STUN, IPv6 bypass, and sockets opened before the VPN are not tested. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
