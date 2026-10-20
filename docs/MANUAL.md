@@ -239,6 +239,8 @@ The controller **droidcommand-AI** (`ai.droidcommand.app`) can:
 
 It cannot read keys, auth keys, or other secrets. It cannot log you in. It cannot start or stop a WireGuard profile, and a settings import never copies WireGuard private keys.
 
+**Victorious Browser** (`com.victorious.browser`) is a read-only fleet app. After you switch on **Allow fleet controller**, it may only ask for connection status and this phone's mesh IP. It cannot turn the mesh on or off, cannot read the status-tray snapshot, and cannot use the newer remote-control commands. Other operations are refused as not authorized. Mesh IP addresses are never written to logs or backups. **[not device-verified]**
+
 **While WireGuard mode is on:** `mesh.status` reports the mesh as down (`connected: false`, no mesh IPs). `mesh.up` is refused until you switch back to mesh mode in the app. `mesh.down` does not tear down the WireGuard tunnel. The status-tray snapshot also shows the mesh as down and the VPN as up (the WireGuard tunnel).
 
 ### External control is off by default
@@ -251,12 +253,13 @@ Turn the same switch **off** at any time to block the controller again.
 
 ### Package and certificate allowlist
 
-Only these two packages are accepted, and only if they are signed with a pinned certificate (SHA-256):
+Only these packages are accepted, and only if they are signed with a pinned certificate (SHA-256):
 
-| Package | Allowed certificates |
-|---|---|
-| `ai.droidcommand.app` | Debug `88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D` and release `9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D` |
-| `ai.droidcommand.app.debug` | The same two certificates |
+| Package | Scope | Allowed certificates |
+|---|---|---|
+| `ai.droidcommand.app` | Full | Debug `88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D` and release `9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D` |
+| `ai.droidcommand.app.debug` | Full | The same two certificates |
+| `com.victorious.browser` | Status and mesh IP only | Debug `2D:5D:9E:8B:53:8E:78:51:3D:B5:41:F4:DF:FD:67:BE:27:FF:EC:3F:37:EB:1A:D4:8D:77:83:AE:59:27:C3:E1` (release certificate not set yet) |
 
 Anything else is rejected. Victorious Mesh is signed with its **own** key; it does not share a signing key with the controller.
 
@@ -349,6 +352,6 @@ under **Settings → WireGuard**.
 - **Diagnostic log upload is disabled.** The app does not send diagnostic logs to a remote log server. That path is switched off in the build (always reports logging as off; remote upload cannot be turned on). Logs that the VPN core writes stay on the device.
 - **There is no in-app bug-report upload.** The old report screen is not linked from Settings, because it targeted that remote log server.
 - **Keys stay on this device.** Login and node keys are stored in encrypted app storage. Extra hardware-backed keys use the Android Keystore when the phone supports it. Auth keys you paste are handed to the local VPN engine for login; they are not written to the Control server preference. WireGuard configs, including private keys, stay in the same encrypted on-device store and are not written to logs or error messages. Android backup for this app is off, so those secrets are not copied to cloud backup.
-- **The fleet bridge** returns status and IP addresses only — never keys, tokens, or file contents.
+- **The fleet bridge** returns status and IP addresses only — never keys, tokens, or file contents. Mesh IP addresses are not written to logs or backups.
 - **What the intro text still says.** The first-run paragraph mentions that a name, device name, OS version, and IP are used to connect devices. That text is shown in the app; this build does not upload diagnostic logs, and your Headscale server is the control plane you configured.
 - **Licensing.** Victorious Mesh is a modified open-source client (BSD-3-Clause). Credit to the original authors belongs in the license files (`LICENSE`, `NOTICE`, `PATENTS`) and on the About screen. This app is not affiliated with or endorsed by those original authors.

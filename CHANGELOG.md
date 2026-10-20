@@ -15,6 +15,13 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- Per-caller fleet allowlist scope. Victorious Browser
+  (`com.victorious.browser`, debug cert pinned; release TBD) may call only
+  `mesh.status` and `mesh.ip` / `mesh.ip.get`. All other ops, including
+  `node.status.get`, `config.*`, `mesh.up`/`mesh.down`, and every remote
+  envelope `op`, return `unauthorized` / `unauthorized_caller`.
+  droidcommand-AI stays full-access. Mesh IPs are never logged and must
+  never appear in config backups (`FleetRedaction`).
 - Fleet `config.export` / `config.import` (UNIFIED_BACKUP, droidcommand-AI
   #236): standalone `BridgeRequest` ops (not `remote.command` actionRefs)
   with v1.1 envelope fields in `parameters`. Advertised on `capabilities.get`

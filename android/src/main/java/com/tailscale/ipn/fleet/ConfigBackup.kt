@@ -345,6 +345,9 @@ object UnifiedBackupCodec {
 
   private fun scanClearPayload(raw: String) {
     BackupSecretScanner.refuseIfSecretText(raw, "payload")
+    if (FleetRedaction.containsMeshAddress(raw) || FleetRedaction.jsonContainsBackupForbiddenKeys(raw)) {
+      throw InvalidParametersException("payload must not include mesh IP addresses")
+    }
     val el =
         try {
           MeshBackup.json.parseToJsonElement(raw)

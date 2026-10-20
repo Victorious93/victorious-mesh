@@ -267,7 +267,7 @@ class FleetProtocolTest {
       assertTrue(CallerAllowlist.isAllowed(mapOf(pkg to listOf(CallerAllowlist.normalize(rel)))))
       assertEquals(setOf(CallerAllowlist.normalize(dca), CallerAllowlist.normalize(rel)), CallerAllowlist.ENTRIES[pkg])
     }
-    assertEquals(2, CallerAllowlist.ENTRIES.size)
+    assertEquals(3, CallerAllowlist.ENTRIES.size)
     assertFalse(CallerAllowlist.isAllowed(mapOf("evil.app" to listOf(rel))))
   }
 
@@ -277,6 +277,7 @@ class FleetProtocolTest {
     assertFalse(CallerAllowlist.isAllowed(mapOf("ai.droidcommand.app" to listOf("00".repeat(32)))))
     assertFalse(CallerAllowlist.isAllowed(mapOf("ai.droidcommand.app" to emptyList())))
     assertFalse(CallerAllowlist.isAllowed(emptyMap()))
+    assertEquals(CallerScope.NONE, CallerAllowlist.scopeFor(emptyMap()))
   }
 
   @Test
