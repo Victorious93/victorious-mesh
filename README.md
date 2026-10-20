@@ -1,8 +1,28 @@
+<!-- victorious-fleet-readme-refresh:start -->
 <p align="center">
-  <img src="assets/logo.png" alt="victorious-mesh logo" width="200">
+  <img src="assets/logo.png" alt="Victorious Mesh logo" width="200">
 </p>
 
 # Victorious Mesh
+
+Secure mesh-networking / VPN Android app for the fleet.
+
+**Package id:** `com.victorious.mesh`
+
+**Status:** CI green *(from [fleet-manifest ROADMAP](https://github.com/Victorious93/fleet-manifest/blob/main/ROADMAP.md))*
+
+## Install / build
+
+Android Gradle under `android/` (`android/build.gradle.kts`). Typical: `cd android && ./gradlew assembleDebug` if wrapper present.
+
+_Steps above are taken from this repo’s build files / existing docs; anything not exercised in this refresh is unlabeled as verified on a device._
+
+## Victorious fleet
+
+- Monorepo: [https://github.com/Victorious93/victorious-fleet](https://github.com/Victorious93/victorious-fleet)
+- Fleet site: [https://victorious-framework.pages.dev](https://victorious-framework.pages.dev)
+
+<!-- victorious-fleet-readme-refresh:end -->
 
 Victorious Mesh is a secure mesh-networking / VPN app for Android
 (`com.victorious.mesh`). It connects your phone to Don's private network, run by a
