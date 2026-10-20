@@ -160,6 +160,15 @@ Android Always-on VPN plus “Block connections without VPN” is the
 stronger system lock. Another app taking the VPN slot cannot be held.
 Direct apps still bypass. No new fleet operations.
 
+## Auto-connect
+
+**Settings → Auto-connect.** Off by default. **[not device-verified]**
+
+Starts the last tunnel (mesh or the last WireGuard profile) when the
+app opens or the phone finishes booting, if VPN permission was already
+granted. Android 12+ may block a start from boot. Always-on VPN is
+more reliable. No start before first unlock. No new fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

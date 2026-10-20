@@ -473,6 +473,14 @@
     <string name="killswitch_off">Off. Traffic can use Wi-Fi or cellular if the tunnel stops.</string>
     <string name="killswitch_limits">This is app-level. It cannot hold the VPN if another app takes it, and Direct apps in Per-app routing still bypass. Android Always-on VPN plus \u201cBlock connections without VPN\u201d is stronger. Open that screen to enable it.</string>
     <string name="killswitch_open_android_vpn">Open Android VPN settings</string>
+    <string name="autoconnect_title">Auto-connect</string>
+    <string name="autoconnect_settings_subtitle">Start the last tunnel when the app opens or the phone boots. Off by default</string>
+    <string name="autoconnect_heading">Start the tunnel without tapping Connect</string>
+    <string name="autoconnect_body">Off by default. When this is on, opening the app or finishing boot starts the last mode (mesh or WireGuard) if you have already granted VPN permission. [not device-verified]</string>
+    <string name="autoconnect_enable">Auto-connect</string>
+    <string name="autoconnect_on">On. The last tunnel starts on app open and after boot.</string>
+    <string name="autoconnect_off">Off. You start the tunnel yourself.</string>
+    <string name="autoconnect_limits">Android 12 and newer may block a start from boot. Always-on VPN in Android settings is more reliable. This does not start before the first unlock, and it does not start if VPN permission was never granted. There is no fleet operation for this.</string>
     <string name="help_title">Help</string>
     <string name="help_settings_row">Help / Manual</string>
     <string name="help_load_error">The user manual could not be loaded.</string>

@@ -15,6 +15,11 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Auto-connect (Settings → Auto-connect).** Off by default. Starts
+  the last mesh or WireGuard tunnel on app open and after boot when
+  VPN permission is already granted. Android 12+ may block boot
+  starts; Always-on VPN is documented as stronger. No new fleet ops.
+  **[not device-verified]**
 - **Kill switch (Settings → Kill switch).** Off by default. When the
   mesh or WireGuard is started, an unexpected drop holds a blocking
   VPN and reconnects. Explicit disconnect (main switch / tile) leaves.
