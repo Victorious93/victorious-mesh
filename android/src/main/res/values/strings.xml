@@ -449,6 +449,17 @@
     <string name="proxy_notify_channel">Mesh proxy</string>
     <string name="proxy_notify_channel_desc">Shown while this phone is sharing a mesh proxy</string>
     <string name="proxy_not_device_verified">[not device-verified] Live bind, notification, and leak behaviour on a real phone have not been checked.</string>
+    <string name="perapp_title">Per-app routing</string>
+    <string name="perapp_settings_subtitle">Direct bypass or mesh per app. Exit node and upstream proxy are device-wide</string>
+    <string name="perapp_limits">One VPN cannot give each app its own exit node or upstream proxy. Direct (bypass) is the only per-app path. Exit node and upstream proxy choices are saved, but those apps still use this phone\'s single tunnel. The IP check runs from Victorious Mesh, not from the other app. Per-app traffic totals need a usage-access permission that this screen does not request. No GPS spoofing.</string>
+    <string name="perapp_endpoint">Public IP check URL</string>
+    <string name="perapp_check">What IP and country sites see</string>
+    <string name="perapp_sighting">Sites see %1$s (%2$s). This is this app\'s path, not another app\'s.</string>
+    <string name="perapp_kind_direct">Direct</string>
+    <string name="perapp_kind_mesh">Mesh only</string>
+    <string name="perapp_kind_exit">Exit node</string>
+    <string name="perapp_kind_upstream">Upstream proxy</string>
+    <string name="perapp_not_device_verified">[not device-verified] Live per-app bypass and the public-IP check on a real phone have not been checked.</string>
     <string name="help_title">Help</string>
     <string name="help_settings_row">Help / Manual</string>
     <string name="help_load_error">The user manual could not be loaded.</string>

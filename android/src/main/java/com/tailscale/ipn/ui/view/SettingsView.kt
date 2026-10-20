@@ -126,6 +126,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.perapp_title,
+          subtitle = stringResource(R.string.perapp_settings_subtitle),
+          onClick = settingsNav.onNavigateToPerAppRouting,
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.split_tunneling,
           subtitle = stringResource(R.string.filter_apps_allowed_to_access_tailscale),
           onClick = settingsNav.onNavigateToSplitTunneling,

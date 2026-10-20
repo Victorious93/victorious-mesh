@@ -174,6 +174,25 @@ This is the other direction: apps on this phone would send internet traffic thro
 
 **Leak limit — this cannot promise no leak.** `setHttpProxy` is advisory. Apps that do not honor it send traffic through the VPN (or the underlay) without the proxy. SOCKS5 cannot be applied to every app. After you change these settings, disconnect and reconnect the mesh.
 
+### Per-app routing
+
+![Per-app routing](images/manual/per-app-routing.png)
+
+*Screenshot pending.*
+
+**Settings → Per-app routing**
+
+Pick a route for each installed app. **[not device-verified]**
+
+1. **Direct** — that app skips the VPN (Wi‑Fi or cellular).
+2. **Mesh only** — that app uses this phone's mesh tunnel.
+3. **Exit node** — you can pick a Headscale exit node to remember, but Android has **one** VPN. The exit node is device-wide. The app still uses the same tunnel as Mesh only.
+4. **Upstream proxy** — remembered only. The proxy in **Settings → Proxy** is device-wide.
+
+**What IP and country sites see** fetches a public IP (and country if the JSON has one) from a URL you set, on demand only. The request is made by Victorious Mesh itself, so it shows *this* app's path, not the other app's Direct path.
+
+**Limits.** One tunnel cannot give each app a different exit node or proxy. Per-app traffic totals are not tracked (that would need a usage-access permission this screen does not ask for). No GPS spoofing (VictorSpoof owns that). MDM split-tunnel lists still win over these choices. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**

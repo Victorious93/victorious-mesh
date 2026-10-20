@@ -30,6 +30,7 @@ data class SettingsNav(
     val onNavigateToWireGuard: () -> Unit = {},
     val onNavigateToHelp: () -> Unit = {},
     val onNavigateToProxy: () -> Unit = {},
+    val onNavigateToPerAppRouting: () -> Unit = {},
 )
 
 class SettingsViewModel : IpnViewModel() {

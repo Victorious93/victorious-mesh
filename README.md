@@ -131,6 +131,23 @@ no leak** when an upstream proxy is enabled.
 **Fleet bridge:** no new operations. The Orchestrator must ratify any later
 remote control.
 
+## Per-app routing
+
+**Settings → Per-app routing.** **[not device-verified]**
+
+**Feasible:** **Direct** (bypass VPN) vs **Mesh** via
+`addDisallowedApplication` / the existing split-tunnel lists.
+
+**Not per-app on one tunnel:** **Exit node** and **Upstream proxy** are
+device-wide. The UI can remember a choice; those apps still use the single
+mesh/exit/proxy.
+
+**IP/location check:** on-demand GET to a configurable JSON endpoint. Runs
+from this app, so it is not a true per-app vantage point for Direct apps.
+
+**Traffic:** not tracked (would need usage-access). No GPS spoofing. No new
+fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

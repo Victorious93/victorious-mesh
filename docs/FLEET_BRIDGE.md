@@ -287,6 +287,10 @@ No fleet operations for the on-phone mesh proxy or the outbound/upstream
 proxy. Settings → Proxy is local only. The Fleet Orchestrator must ratify
 any later remote control.
 
+### Per-app routing
+
+No fleet operations. Settings → Per-app routing is local only.
+
 ## Errors
 
 Legacy `mesh.*` BridgeRequests still use the v1.0 categories

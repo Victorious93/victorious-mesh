@@ -15,6 +15,12 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Per-app routing (Settings → Per-app routing).** Direct bypass via
+  `addDisallowedApplication`. Exit node and upstream proxy choices are
+  saved but cannot be applied per app on one VpnService (device-wide
+  only). On-demand public IP/country check from a configurable endpoint
+  (this app's path). No per-app traffic counters. No GPS spoofing. No
+  new fleet ops. **[not device-verified]**
 - **Proxy (Settings → Proxy).** Off by default. Share this phone as a
   mesh-bound SOCKS5 + HTTP CONNECT listener (userspace proxies in
   libtailscale; bind only this node's mesh IPv4, never 0.0.0.0 / Wi-Fi /
