@@ -90,6 +90,25 @@ class ProxyPlannerTest {
   }
 
   @Test
+  fun forcedDNSStatusParsesGoStates() {
+    assertEquals(ForcedDNSStatus.OFF, ForcedDNSStatus.fromRaw("off"))
+    assertEquals(ForcedDNSStatus.PENDING, ForcedDNSStatus.fromRaw("pending"))
+    assertEquals(ForcedDNSStatus.UDP, ForcedDNSStatus.fromRaw("udp"))
+    assertEquals(ForcedDNSStatus.TCP, ForcedDNSStatus.fromRaw("TCP"))
+    assertEquals(ForcedDNSStatus.BLOCKED, ForcedDNSStatus.fromRaw("blocked"))
+    assertEquals(ForcedDNSStatus.OFF, ForcedDNSStatus.fromRaw("nope"))
+  }
+
+  @Test
+  fun forcedIPv6StatusParsesGoStates() {
+    assertEquals(ForcedIPv6Status.OFF, ForcedIPv6Status.fromRaw("off"))
+    assertEquals(ForcedIPv6Status.UNKNOWN, ForcedIPv6Status.fromRaw("unknown"))
+    assertEquals(ForcedIPv6Status.VIA_PROXY, ForcedIPv6Status.fromRaw("via_proxy"))
+    assertEquals(ForcedIPv6Status.BLOCKED, ForcedIPv6Status.fromRaw("blocked"))
+    assertEquals(ForcedIPv6Status.OFF, ForcedIPv6Status.fromRaw(""))
+  }
+
+  @Test
   fun planOutboundDoesNotExcludeHostnamesOrMeshIps() {
     val host = ProxyPlanner.planOutbound(UpstreamKind.HTTP, "proxy.example.com", 8080, 33)
     assertTrue(host.applyHttpProxy)

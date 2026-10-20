@@ -128,6 +128,20 @@ object MeshProxyController {
     } catch (_: Exception) {
     }
   }
+
+  fun forcedDNSState(): ForcedDNSStatus =
+      try {
+        ForcedDNSStatus.fromRaw(Libtailscale.forcedDNSState())
+      } catch (_: Exception) {
+        ForcedDNSStatus.OFF
+      }
+
+  fun forcedIPv6State(): ForcedIPv6Status =
+      try {
+        ForcedIPv6Status.fromRaw(Libtailscale.forcedIPv6State())
+      } catch (_: Exception) {
+        ForcedIPv6Status.OFF
+      }
 }
 
 object MeshProxyNotifier {

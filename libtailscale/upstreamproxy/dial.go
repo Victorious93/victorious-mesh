@@ -49,6 +49,15 @@ func (d Dialer) DialTCP(ctx context.Context, dest string) (net.Conn, error) {
 	if !d.Cfg.Enabled() {
 		return nil, errors.New("forced upstream is off")
 	}
+	if destIsIPv6(dest) && IPv6State() == IPv6Blocked {
+		return nil, ErrIPv6Blocked
+	}
+	// Public DNS is always fail-closed: never the underlay, even if
+	// the user left FailClosed off. Mesh DNS never reaches DialTCP.
+	if p, ok := destPort(dest); ok && p == dnsPort {
+		d.Cfg.FailClosed = true
+		d.Direct = nil
+	}
 	var (
 		c   net.Conn
 		err error
@@ -62,7 +71,22 @@ func (d Dialer) DialTCP(ctx context.Context, dest string) (net.Conn, error) {
 		return nil, fmt.Errorf("unsupported kind %q", d.Cfg.Kind)
 	}
 	if err == nil {
+		if destIsIPv6(dest) {
+			noteIPv6(IPv6ViaProxy)
+		}
+		if p, ok := destPort(dest); ok && p == dnsPort {
+			noteDNS("tcp")
+		}
 		return c, nil
+	}
+	if p, ok := destPort(dest); ok && p == dnsPort {
+		noteDNS("blocked")
+	}
+	if destIsIPv6(dest) {
+		if ipv6RejectedByProxy(err) {
+			noteIPv6(IPv6Blocked)
+		}
+		return nil, err
 	}
 	if d.Cfg.FailClosed || d.Direct == nil {
 		return nil, err

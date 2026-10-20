@@ -5,7 +5,10 @@ package com.tailscale.ipn.ui.viewModel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.tailscale.ipn.App
+import com.tailscale.ipn.proxy.ForcedDNSStatus
+import com.tailscale.ipn.proxy.ForcedIPv6Status
 import com.tailscale.ipn.proxy.MeshProxyConfig
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
@@ -14,8 +17,11 @@ import com.tailscale.ipn.proxy.UpstreamProxyConfig
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.ui.util.set
 import com.tailscale.ipn.wireguard.WireGuardManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class ProxyViewModel(app: Application) : AndroidViewModel(app) {
   private val store = MeshProxyController.store(app)
@@ -24,6 +30,22 @@ class ProxyViewModel(app: Application) : AndroidViewModel(app) {
   val upstream: StateFlow<UpstreamProxyConfig> = MutableStateFlow(store.upstream())
   val running: StateFlow<Boolean> = MutableStateFlow(MeshProxyController.running())
   val message: StateFlow<String?> = MutableStateFlow(null)
+  val dnsState: StateFlow<ForcedDNSStatus> = MutableStateFlow(MeshProxyController.forcedDNSState())
+  val ipv6State: StateFlow<ForcedIPv6Status> = MutableStateFlow(MeshProxyController.forcedIPv6State())
+
+  init {
+    viewModelScope.launch {
+      while (isActive) {
+        refreshForcedPath()
+        delay(1_500)
+      }
+    }
+  }
+
+  private fun refreshForcedPath() {
+    dnsState.set(MeshProxyController.forcedDNSState())
+    ipv6State.set(MeshProxyController.forcedIPv6State())
+  }
 
   fun meshBindLabel(): String {
     val addrs = Notifier.netmap.value?.SelfNode?.Addresses.orEmpty()
@@ -95,6 +117,7 @@ class ProxyViewModel(app: Application) : AndroidViewModel(app) {
     upstream.set(next)
     val ctx = getApplication<Application>()
     MeshProxyController.syncForced(ctx)
+    refreshForcedPath()
     if (needsRestart) {
       App.get().restartVPN()
     }
@@ -102,7 +125,7 @@ class ProxyViewModel(app: Application) : AndroidViewModel(app) {
         when {
           kind == UpstreamKind.NONE -> "Upstream proxy off. Reconnect the mesh for this to apply."
           next.forced ->
-              "Forced TUN-to-proxy is on. TCP (and SOCKS5 UDP ASSOCIATE) goes through the proxy. Reconnect if the mesh is already up."
+              "Forced TUN-to-proxy is on. TCP, public DNS, and IPv6 (or a block) go through the proxy. Reconnect if the mesh is already up."
           kind == UpstreamKind.HTTP ->
               "HTTP upstream is advisory (Android 10+) unless you turn on Force all traffic. Apps may ignore it."
           else -> "SOCKS5 is save-only unless you turn on Force all traffic."

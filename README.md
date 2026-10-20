@@ -124,10 +124,13 @@ runs. WireGuard mode turns it off.
 **Upstream:** HTTP on Android 10+ can still use advisory `setHttpProxy`
 (apps may ignore it). **Force all traffic** (off by default) is a
 TUN-to-SOCKS5/HTTP-CONNECT path in libtailscale: TCP goes through the
-proxy with credentials; UDP uses SOCKS5 UDP ASSOCIATE or is blocked;
-fail-closed blocks flows if the proxy drops. Literal non-mesh proxy IPs
-are excluded from the VPN to avoid a loop. DNS and IPv6 remain limited
-(see MANUAL). **[not device-verified]**
+proxy with credentials; public DNS uses SOCKS5 UDP ASSOCIATE or DNS
+over TCP (mesh / MagicDNS stays on the mesh; fail-closed if the proxy
+is down); IPv6 goes through the proxy when the upstream supports it,
+otherwise IPv6 is blocked and is never leaked on the underlay; UDP uses
+SOCKS5 UDP ASSOCIATE or is blocked; fail-closed blocks flows if the
+proxy drops. Literal non-mesh proxy IPs are excluded from the VPN to
+avoid a loop. Status is shown on the Proxy screen. **[not device-verified]**
 
 **Fleet bridge:** no new operations. The Orchestrator must ratify any later
 remote control.

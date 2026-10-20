@@ -15,6 +15,14 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Forced-proxy DNS and IPv6 (Settings → Proxy).** When Force all
+  traffic is on, public DNS goes through the proxy (SOCKS5 UDP
+  ASSOCIATE, else DNS over TCP). Mesh / MagicDNS stays on the mesh.
+  DNS is fail-closed if the proxy is down. IPv6 is sent through the
+  proxy when the upstream supports it; otherwise IPv6 is blocked and
+  is never leaked on the underlay. Live DNS and IPv6 status is shown
+  on the Proxy screen. Off by default. No new fleet ops.
+  **[not device-verified]**
 - **VictorGPS stub (Settings → VictorGPS stub).** Off by default. Local
   room profile (lat/lng + optional target-app package). Does not mock
   GPS and is not added to the fleet allowlist. Debug cert recorded
@@ -38,8 +46,9 @@
   default. TUN-to-SOCKS5/HTTP-CONNECT in libtailscale sends app TCP
   (and SOCKS5 UDP ASSOCIATE) through the chosen proxy with credentials.
   Fail-closed blocks those flows if the proxy drops. Mesh IPs stay on
-  the mesh; the proxy host is excluded to prevent a routing loop. DNS
-  and IPv6 gaps are documented. No new fleet ops. **[not device-verified]**
+  the mesh; the proxy host is excluded to prevent a routing loop.
+  Public DNS and IPv6 are handled by the forced-proxy DNS/IPv6 path
+  (see above). No new fleet ops. **[not device-verified]**
 - **Per-app routing (Settings → Per-app routing).** Direct bypass via
   `addDisallowedApplication`. Exit node and upstream proxy choices are
   saved but cannot be applied per app on one VpnService (device-wide

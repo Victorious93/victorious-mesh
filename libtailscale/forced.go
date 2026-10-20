@@ -49,6 +49,16 @@ func ForcedUpstreamEnabled() bool {
 	return upstreamproxy.Get().Enabled()
 }
 
+// ForcedDNSState is "off", "pending", "udp", "tcp", or "blocked".
+func ForcedDNSState() string {
+	return upstreamproxy.DNSState()
+}
+
+// ForcedIPv6State is "off", "unknown", "via_proxy", or "blocked".
+func ForcedIPv6State() string {
+	return upstreamproxy.IPv6State()
+}
+
 var forcedReconfigure func() error
 
 func reconfigureForcedVPN() {
