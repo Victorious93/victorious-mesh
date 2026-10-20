@@ -46,12 +46,12 @@ class FleetEnvelopeTest {
   private class RecordingSink : ConfirmationSink {
     val pending = ArrayList<PendingConfirmation>()
 
-    override fun onConfirmationRequired(p: PendingConfirmation) {
-      pending.add(p)
+    override fun onConfirmationRequired(pending: PendingConfirmation) {
+      this.pending.add(pending)
     }
   }
 
-  private class Harness(
+  private inner class Harness(
       val backend: FakeBackend = FakeBackend(),
       val clock: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(now0),
       val nonceCache: NonceCache = NonceCache(),
