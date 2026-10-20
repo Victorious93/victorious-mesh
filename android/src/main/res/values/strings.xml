@@ -464,6 +464,15 @@
     <string name="perapp_kind_exit">Exit node</string>
     <string name="perapp_kind_upstream">Upstream proxy</string>
     <string name="perapp_not_device_verified">[not device-verified] Live per-app bypass and the public-IP check on a real phone have not been checked.</string>
+    <string name="killswitch_title">Kill switch</string>
+    <string name="killswitch_settings_subtitle">Block internet if the tunnel drops. Off by default</string>
+    <string name="killswitch_heading">Block internet if the tunnel drops</string>
+    <string name="killswitch_body">Off by default. When this is on and you have started the mesh or WireGuard, an unexpected drop holds a blocking VPN and tries to reconnect. Turn the main switch (or Quick Settings tile) off to leave. [not device-verified]</string>
+    <string name="killswitch_enable">Kill switch</string>
+    <string name="killswitch_on">On. Unexpected drops are held and the tunnel is restarted.</string>
+    <string name="killswitch_off">Off. Traffic can use Wi-Fi or cellular if the tunnel stops.</string>
+    <string name="killswitch_limits">This is app-level. It cannot hold the VPN if another app takes it, and Direct apps in Per-app routing still bypass. Android Always-on VPN plus \u201cBlock connections without VPN\u201d is stronger. Open that screen to enable it.</string>
+    <string name="killswitch_open_android_vpn">Open Android VPN settings</string>
     <string name="help_title">Help</string>
     <string name="help_settings_row">Help / Manual</string>
     <string name="help_load_error">The user manual could not be loaded.</string>

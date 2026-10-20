@@ -263,6 +263,9 @@ func closeFileDescriptor() error {
 func (b *backend) CloseTUNs() {
 	b.lastCfg = nil
 	b.devices.Shutdown()
+	if vpnService.service != nil {
+		vpnService.service.UpdateVpnStatus(false)
+	}
 }
 
 // ifname is the interface name retrieved from LinkProperties on network change. If a network is lost, an empty string is passed in.

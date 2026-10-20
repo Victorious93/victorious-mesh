@@ -195,6 +195,24 @@ Pick a route for each installed app. **[not device-verified]**
 
 **Limits.** One tunnel cannot give each app a different exit node or proxy. Per-app traffic totals are not tracked (that would need a usage-access permission this screen does not ask for). No GPS spoofing (VictorSpoof owns that). MDM split-tunnel lists still win over these choices. There is **no fleet operation** for this.
 
+### Kill switch
+
+![Kill switch](images/manual/kill-switch.png)
+
+*Screenshot pending.*
+
+**Settings → Kill switch**
+
+**Off by default.** **[not device-verified]**
+
+When this is on and you have started the mesh or WireGuard, the app treats that as “the tunnel should stay up”:
+
+1. An unexpected drop (service killed, TUN closed, Always-on restart) holds a **blocking** VPN so apps cannot fall back to Wi‑Fi or cellular, then tries to reconnect.
+2. Turn the **main-screen switch** or the Quick Settings tile **off** to leave. That is an explicit disconnect and tears the hold down.
+3. A link opens Android’s VPN settings. **Always-on VPN** plus **Block connections without VPN** is the stronger, system-level lock. Use that if you need the OS to refuse traffic whenever this app is not the VPN.
+
+**Limits.** Another app taking the VPN slot (`onRevoke`) cannot be held — the system gives that app the interface. Apps set to **Direct** in Per-app routing still bypass. The blackhole uses documentation addresses (`192.0.2.1` / `2001:db8::1`) and is replaced when the real tunnel comes back. IPv6 hold can fail on some devices. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -407,6 +425,8 @@ under **Settings → WireGuard**.
 **The mesh proxy will not start.** Connect the mesh first (not WireGuard). The listener needs this phone's `100.x` address. Check the port is 1024–65535, and that username and password are both set or both empty. **[not device-verified]**
 
 **Internet still bypasses my upstream proxy.** Advisory HTTP (Android 10+) is not forced. Turn on **Force all traffic** to send VPN TCP through the proxy. UDP still needs SOCKS5 UDP ASSOCIATE. DNS, IPv6, ICMP, Direct apps, and WireGuard mode are documented gaps. See **Settings → Proxy**.
+
+**The kill switch is on but I still have internet after a drop.** Turn the main switch off only when you want to leave. Direct apps skip the VPN. If another VPN app took the slot, this app cannot hold it. Use Android **Always-on VPN** and **Block connections without VPN** for a system lock. **[not device-verified]**
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 

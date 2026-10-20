@@ -15,6 +15,11 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Kill switch (Settings → Kill switch).** Off by default. When the
+  mesh or WireGuard is started, an unexpected drop holds a blocking
+  VPN and reconnects. Explicit disconnect (main switch / tile) leaves.
+  Android Always-on + “Block connections without VPN” is documented as
+  stronger. No new fleet ops. **[not device-verified]**
 - **Forced full-traffic upstream proxy (Settings → Proxy).** Off by
   default. TUN-to-SOCKS5/HTTP-CONNECT in libtailscale sends app TCP
   (and SOCKS5 UDP ASSOCIATE) through the chosen proxy with credentials.
