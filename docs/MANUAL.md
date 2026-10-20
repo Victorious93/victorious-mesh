@@ -273,10 +273,13 @@ The controller can send a newer kind of request on the same bridge. In plain lan
 
 - It can ask what this phone allows (`capabilities.get`) even when the Settings switch is off. That answer is a list only; it does not turn the mesh on or off.
 - It can run one mesh action (`remote.command`) or a short list of steps (`macro.step` / `macro.run`). A “dry run” checks the list without doing anything.
-- Each request is time-limited and can be used only once, so an old or copied command is rejected.
+- Each request is time-limited (up to five minutes) and can be used only once, so an old or copied command is rejected. A request stamped more than two minutes in the future is also rejected. A command that is a few minutes old is still accepted if it is inside its time limit.
+- The command must name this phone. A blank or badly formed name is rejected as invalid. A well-formed name for some other phone is treated as not found. This phone, if the sender is not paired with it, is rejected as not paired.
 - The phone decides who is allowed by looking at which app sent the message and how that app is signed. Fields inside the message never grant access.
 
 Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDGE.md).
+
+**[not device-verified]** The envelope, time checks, pairing errors, and the Approve/Deny notification have not been run on a real phone.
 
 ## Troubleshooting and FAQ
 
