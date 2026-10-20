@@ -220,6 +220,16 @@ offers a kill-switch tile, a mesh-proxy tile, a status tile, and a
 home-screen widget. You still add them from Quick Settings or the
 widget picker. No new fleet operations.
 
+## Mesh speed / health
+
+**Settings → Mesh speed / health.** On-demand only.
+**[not device-verified]**
+
+Snapshots mesh grade (OK / degraded / down), peer path mix (direct vs
+relay), lifetime tunnel transfer, backend health warnings, and one
+disco ping to the first online IPv4 peer. Not an internet speed test.
+WireGuard mode reports mesh down. No new fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

@@ -524,6 +524,16 @@
     <string name="extratiles_on">On. Add the tiles from Quick Settings and the widget from the home-screen picker.</string>
     <string name="extratiles_off">Off. Extra tiles and the widget stay hidden.</string>
     <string name="extratiles_limits">The original connect tile is unchanged. Extra tiles and the widget do nothing until this switch is on. There is no fleet operation for this.</string>
+    <string name="meshhealth_title">Mesh speed / health</string>
+    <string name="meshhealth_settings_subtitle">On-demand path, latency, and transfer check</string>
+    <string name="meshhealth_heading">On-demand mesh check</string>
+    <string name="meshhealth_body">Nothing runs until you tap Run check. This snapshots mesh path quality (direct vs relay), lifetime tunnel transfer, backend warnings, and one disco ping to the first online IPv4 peer. It is not an internet speed test. [not device-verified]</string>
+    <string name="meshhealth_run">Run check</string>
+    <string name="meshhealth_running">Checking…</string>
+    <string name="meshhealth_ok">OK</string>
+    <string name="meshhealth_warn">Warn</string>
+    <string name="meshhealth_fail">Fail</string>
+    <string name="meshhealth_limits">This is not a third-party download test. Latency is one disco ping to a mesh peer. Transfer is lifetime engine bytes, not current throughput. WireGuard mode reports mesh down. There is no fleet operation for this.</string>
     <string name="tile_killswitch">Kill switch</string>
     <string name="tile_proxy_share">Mesh proxy</string>
     <string name="tile_status">Mesh status</string>

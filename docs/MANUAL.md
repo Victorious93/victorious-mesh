@@ -288,6 +288,29 @@ The original **Victorious Mesh** Quick Settings tile still toggles the VPN. This
 
 After you turn this on, add the tiles from the Quick Settings editor and the widget from the home-screen widget picker. Turning the switch off hides those components again. The original connect tile is unchanged. There is **no fleet operation** for this.
 
+### Mesh speed / health
+
+![Mesh speed / health](images/manual/mesh-health.png)
+
+*Screenshot pending.*
+
+**Settings → Mesh speed / health**
+
+**On demand** — nothing runs until you tap **Run check**. **[not device-verified]**
+
+This page snapshots the mesh on this phone:
+
+1. Overall grade: **OK**, **degraded**, or **down**.
+2. Whether the VPN is up and whether the backend is Running.
+3. Backend health warnings (same source as the main-screen health icon).
+4. Peer path mix: how many peers are online, how many have a **direct** `CurAddr`, and how many are on a DERP or peer relay.
+5. Latency: one **disco ping** to the first online IPv4 peer (not ICMP, not a public host).
+6. Transfer: lifetime engine read/write bytes and live-peer count.
+
+**This is not an internet speed test.** It does not download from a third-party CDN. “Speed” here is path quality (direct vs relay) plus lifetime tunnel transfer.
+
+**Limits.** WireGuard mode reports mesh **down** — this page is for the mesh, not a WireGuard profile. A mixed path (some direct, some relay) is still OK. All-relay, no online peers, or backend warnings are degraded. High disco-ping latency (250 ms or more) is a warning, not a down grade. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -507,6 +530,8 @@ under **Settings → WireGuard**.
 **Auto-connect did not start after reboot.** Grant VPN permission once first. Android 12+ may block a start from boot — use **Always-on VPN**. The app does not start before the first unlock. **[not device-verified]**
 
 **I cannot find the extra tiles or the widget.** Turn on **Settings → Tiles & widget**, then add them from the Quick Settings editor or the home-screen widget picker. The original Victorious Mesh tile is always available. **[not device-verified]**
+
+**Mesh speed / health looks slow or only shows relay.** This is not an internet speed test. It reports mesh path quality and one disco ping to a peer. Relayed paths are expected when UDP is blocked. WireGuard mode reports mesh down. **[not device-verified]**
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 
