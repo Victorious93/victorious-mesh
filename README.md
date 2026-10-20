@@ -22,6 +22,12 @@ self-hosted [Headscale](https://headscale.net) control server.
 - Diagnostic log upload to Tailscale is permanently disabled.
 - ABIs: arm64-v8a and armeabi-v7a.
 
+## User manual
+
+The full user guide is [docs/MANUAL.md](docs/MANUAL.md). The same document is bundled
+into the app: open **Help** from the main screen, or **Settings → Help / Manual**.
+Screenshot files are placeholders until they are captured (`images/manual/*.png`).
+
 ## Where it fits in the fleet
 
 Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app

@@ -17,5 +17,6 @@ WireGuard is a registered trademark of Jason A. Donenfeld.
 
 Modifications by Victorious Mesh include: rebranding (application id, name,
 icon, theme), a user-configurable Headscale control server, permanently
-disabled upload of diagnostic logs, debug/release signing configuration and a
-reduced set of ABIs.
+disabled upload of diagnostic logs, debug/release signing configuration, a
+reduced set of ABIs, a fleet bridge for droidcommand-AI, and an in-app Help
+screen that bundles the user manual.

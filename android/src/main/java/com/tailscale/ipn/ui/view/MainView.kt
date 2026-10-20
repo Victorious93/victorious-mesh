@@ -129,6 +129,7 @@ data class MainViewNavigation(
     val onNavigateToSearch: () -> Unit,
     val onNavigateToControlServer: () -> Unit = {},
     val onNavigateToWireGuard: () -> Unit = {},
+    val onNavigateToHelp: () -> Unit = {},
 )
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -206,16 +207,22 @@ fun MainView(
               }
             },
             trailingContent = {
-              Box(modifier = Modifier.padding(8.dp), contentAlignment = Alignment.CenterEnd) {
-                when (user) {
-                  null -> SettingsButton { navigation.onNavigateToSettings() }
-                  else -> {
-                    Avatar(
-                        profile = user,
-                        size = 36,
-                        { navigation.onNavigateToSettings() },
-                        isFocusable = true,
-                    )
+              Row(
+                  modifier = Modifier.padding(8.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+              ) {
+                HelpButton { navigation.onNavigateToHelp() }
+                Box(contentAlignment = Alignment.CenterEnd) {
+                  when (user) {
+                    null -> SettingsButton { navigation.onNavigateToSettings() }
+                    else -> {
+                      Avatar(
+                          profile = user,
+                          size = 36,
+                          { navigation.onNavigateToSettings() },
+                          isFocusable = true,
+                      )
+                    }
                   }
                 }
               }
@@ -469,6 +476,17 @@ private fun SettingsButton(action: () -> Unit) {
     Icon(
         Icons.Outlined.Settings,
         contentDescription = "Open settings",
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+}
+
+@Composable
+private fun HelpButton(action: () -> Unit) {
+  IconButton(modifier = Modifier.size(24.dp), onClick = { action() }) {
+    Icon(
+        painter = painterResource(R.drawable.info),
+        contentDescription = stringResource(R.string.help_title),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
   }

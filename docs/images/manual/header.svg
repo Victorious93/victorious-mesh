@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-label="Victorious Mesh">
+  <defs>
+    <linearGradient id="ringStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="45%" stop-color="#7A8CFF"/>
+      <stop offset="100%" stop-color="#FF2BD6"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#FF2BD6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#111215" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="halo" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="320" fill="#111215"/>
+  <circle cx="600" cy="160" r="118" fill="url(#coreGlow)"/>
+  <circle cx="600" cy="160" r="92" fill="none" stroke="#00E5FF" stroke-width="22" opacity="0.28" filter="url(#halo)"/>
+  <circle cx="600" cy="160" r="78" fill="none" stroke="url(#ringStroke)" stroke-width="16" filter="url(#softGlow)"/>
+  <circle cx="600" cy="160" r="78" fill="none" stroke="url(#ringStroke)" stroke-width="6"/>
+  <circle cx="600" cy="160" r="9" fill="#00E5FF" filter="url(#softGlow)"/>
+</svg>

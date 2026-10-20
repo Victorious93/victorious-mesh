@@ -15,6 +15,15 @@ repositories {
 
 kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }
 
+// Bundle docs/MANUAL.md into the APK (and JVM unit-test classpath) at build time.
+val generatedManualAssets = layout.buildDirectory.dir("generated/manualAsset")
+val copyManualAsset =
+    tasks.register<Copy>("copyManualAsset") {
+      from(rootDir.resolve("../docs/MANUAL.md"))
+      into(generatedManualAssets.map { it.dir("docs") })
+      rename { "MANUAL.md" }
+    }
+
 android {
   val androidApiLevel = providers.gradleProperty("androidApiLevel").get().toInt()
 
@@ -55,6 +64,11 @@ android {
 
   flavorDimensions += "version"
   namespace = "com.tailscale.ipn"
+
+  sourceSets {
+    getByName("main") { assets.srcDir(generatedManualAssets) }
+    getByName("test") { resources.srcDir(generatedManualAssets) }
+  }
 
   signingConfigs {
     // Fixed, committed debug keystore so every debug build (local + CI) shares
@@ -192,4 +206,13 @@ fun computeVersionCode(): Int {
 
 fun isTV(): Boolean {
   return project.findProperty("PLATFORM")?.toString() == "tv"
+}
+
+tasks.matching { it.name.startsWith("preBuild") }.configureEach { dependsOn(copyManualAsset) }
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+  dependsOn(copyManualAsset)
+}
+tasks.matching { it.name.contains("UnitTestResources") }.configureEach { dependsOn(copyManualAsset) }
+tasks.matching { it.name == "test" || it.name.startsWith("test") }.configureEach {
+  dependsOn(copyManualAsset)
 }
