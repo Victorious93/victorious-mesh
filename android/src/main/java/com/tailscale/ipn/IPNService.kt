@@ -6,10 +6,13 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Network
+import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
 import android.system.OsConstants
 import com.tailscale.ipn.mdm.MDMSettings
+import com.tailscale.ipn.proxy.MeshProxyController
+import com.tailscale.ipn.proxy.ProxyPlanner
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
@@ -34,6 +37,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
   override fun updateVpnStatus(status: Boolean) {
     app.getAppScopedViewModel().setVpnActive(status)
+    if (status) refreshMeshProxy() else MeshProxyController.stop(this)
   }
 
   override fun onCreate() {
@@ -43,6 +47,11 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
     NetworkChangeCallback.setUnderlyingNetworkListener { network ->
       updateUnderlyingNetwork(network)
+    }
+    scope.launch {
+      Notifier.netmap.collect {
+        if (!closed) refreshMeshProxy()
+      }
     }
   }
 
@@ -129,6 +138,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
    * profile id travels in the Intent; the config (with keys) is read from encrypted storage.
    */
   private fun startWireGuard(profileId: String?) {
+    MeshProxyController.stop(this)
     scope.launch {
       val conf =
           profileId?.let { id -> runCatching { WireGuardManager.store().config(id) }.getOrNull() }
@@ -163,6 +173,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   override fun close() {
     if (closed) return
     closed = true
+    MeshProxyController.stop(this)
     stopWireGuard()
     Notifier.setState(Ipn.State.Stopping)
     disconnectVPN()
@@ -257,6 +268,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
             .allowFamily(OsConstants.AF_INET6)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       b.setMetered(false) // Inherit the metered status from the underlying networks.
+      applyOutboundHttpProxy(b)
     }
 
     val underlyingNetwork = NetworkChangeCallback.cachedDefaultNetwork
@@ -310,6 +322,42 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     }
 
     return VPNServiceBuilder(b)
+  }
+
+  private fun refreshMeshProxy() {
+    if (WireGuardManager.isWireGuardActive()) {
+      MeshProxyController.stop(this)
+    } else {
+      MeshProxyController.sync(this)
+    }
+  }
+
+  /**
+   * Advisory HTTP proxy for apps inside the VPN (Android 10+). Cannot promise
+   * no leak: apps may ignore [VpnService.Builder.setHttpProxy]. SOCKS5 is not
+   * applied here. Credentials cannot be attached — the platform API has no
+   * username/password field.
+   */
+  @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+  private fun applyOutboundHttpProxy(b: Builder) {
+    val cfg = MeshProxyController.store(this).upstream()
+    val plan = ProxyPlanner.planOutbound(cfg.kind, cfg.host, cfg.port, Build.VERSION.SDK_INT)
+    if (!plan.applyHttpProxy) {
+      TSLog.d(TAG, "outbound proxy: ${plan.reason}")
+      return
+    }
+    try {
+      b.setHttpProxy(ProxyInfo.buildDirectProxy(cfg.host, cfg.port))
+      val exclude = plan.excludeHost
+      if (exclude != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val prefixLen = if (exclude.contains(':')) 128 else 32
+        val prefix = android.net.IpPrefix(java.net.InetAddress.getByName(exclude), prefixLen)
+        b.excludeRoute(prefix)
+      }
+      TSLog.d(TAG, "outbound HTTP proxy ${cfg.host}:${cfg.port} (${plan.reason})")
+    } catch (e: Exception) {
+      TSLog.e(TAG, "outbound HTTP proxy failed: ${e.message}")
+    }
   }
 
   companion object {

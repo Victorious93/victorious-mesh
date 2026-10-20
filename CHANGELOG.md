@@ -15,6 +15,14 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Proxy (Settings → Proxy).** Off by default. Share this phone as a
+  mesh-bound SOCKS5 + HTTP CONNECT listener (userspace proxies in
+  libtailscale; bind only this node's mesh IPv4, never 0.0.0.0 / Wi-Fi /
+  cellular; optional EncryptedSharedPreferences auth; configurable port;
+  persistent notification). Advisory HTTP *upstream* via
+  `VpnService.Builder.setHttpProxy` (API 29+; apps may ignore it; no
+  credential field). SOCKS5 upstream is saved only. Cannot promise no leak.
+  No new fleet operations. **[not device-verified]**
 - Per-caller fleet allowlist scope. Victorious Browser
   (`com.victorious.browser`, debug cert pinned; release TBD) may call only
   `mesh.status` and `mesh.ip` / `mesh.ip.get`. All other ops, including

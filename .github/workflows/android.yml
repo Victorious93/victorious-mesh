@@ -37,8 +37,8 @@ jobs:
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" --install "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
 
-      - name: Go unit tests (WireGuard config parser)
-        run: go test ./libtailscale/wgquick/...
+      - name: Go unit tests (WireGuard config parser + mesh proxy bind)
+        run: go test ./libtailscale/wgquick/... ./libtailscale/meshproxy/...
 
       - name: Build Go core (gomobile AAR, arm64-v8a + armeabi-v7a)
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" ./scripts/build-aar.sh
