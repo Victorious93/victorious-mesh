@@ -390,8 +390,11 @@ object CallerAllowlist {
  * 2. JSON parse -> malformed_request
  * 3. protocol_major -> protocol_mismatch
  * 4. target_node_id -> node_mismatch
- * 5. external control (except mesh.capabilities.get) -> external_control_disabled
- * 6. operation -> unsupported_operation / invalid_parameters / safety_refused / internal
+ * 5. node.status.get is a standalone read op (see handleNodeStatus): envelope
+ *    fields live in parameters; same replay/expiry; no confirmation.
+ *    External control matches other read ops (mesh.status), not remote.command.
+ * 6. external control (except mesh.capabilities.get) -> external_control_disabled
+ * 7. operation -> unsupported_operation / invalid_parameters / safety_refused / internal
  *
  * Remote envelope v1.1 check order:
  * 1. caller allowlist -> unauthorized
@@ -442,7 +445,7 @@ class FleetDispatcher(
     if (FleetProtocol.looksLikeRemoteEnvelope(raw)) {
       return handleEnvelope(raw, controlEnabled, src)
     }
-    return handleLegacy(raw, controlEnabled)
+    return handleLegacy(raw, controlEnabled, src)
   }
 
   fun confirmAndExecute(pendingId: String): BridgeResponse {
@@ -463,7 +466,11 @@ class FleetDispatcher(
 
   fun denyConfirmation(pendingId: String) = confirmations.deny(pendingId)
 
-  private fun handleLegacy(raw: String?, controlEnabled: Boolean): BridgeResponse {
+  private fun handleLegacy(
+      raw: String?,
+      controlEnabled: Boolean,
+      sourceNodeRef: String,
+  ): BridgeResponse {
     val req =
         try {
           FleetProtocol.json.decodeFromString(BridgeRequest.serializer(), raw ?: "")
@@ -478,6 +485,8 @@ class FleetDispatcher(
         )
     if (req.targetNodeId != nodeId)
         return err(req.requestId, ErrorCategory.NODE_MISMATCH, "target_node_id does not match this node")
+    if (req.operation == FleetProtocol.OP_NODE_STATUS)
+        return handleNodeStatus(req, controlEnabled, sourceNodeRef)
     if (!controlEnabled && req.operation != FleetProtocol.OP_CAPABILITIES)
         return err(
             req.requestId,
@@ -497,6 +506,65 @@ class FleetDispatcher(
       err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
     } catch (e: SafetyRefused) {
       err(req.requestId, ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
+    } catch (e: Exception) {
+      err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  /**
+   * Canonical `node.status.get`: BridgeRequest with v1.1 envelope fields in
+   * `parameters`. Same package+cert auth (already checked), replay, and expiry
+   * as remote control. Does not enter `remote.command` confirmation gating.
+   * External control matches other read ops (`mesh.status`).
+   */
+  private fun handleNodeStatus(
+      req: BridgeRequest,
+      controlEnabled: Boolean,
+      sourceNodeRef: String,
+  ): BridgeResponse {
+    if (!controlEnabled)
+        return err(
+            req.requestId,
+            ErrorCategory.EXTERNAL_CONTROL_DISABLED,
+            "external control is turned off in Victorious Mesh settings",
+        )
+    val params = req.parameters
+    val targetRef = params["targetNodeRef"]?.jsonPrimitive?.contentOrNull?.trim()
+    if (targetRef != null) {
+      if (targetRef.isBlank() || !FleetProtocol.isValidNodeId(targetRef))
+          return err(req.requestId, ErrorCategory.INVALID_PARAMETERS, "targetNodeRef is blank or malformed")
+      val known = knownNodeRefs ?: setOf(nodeId)
+      if (targetRef !in known)
+          return err(req.requestId, ErrorCategory.NOT_FOUND, "targetNodeRef is unknown or unresolvable")
+      if (!pairing.isPaired(sourceNodeRef, targetRef))
+          return err(req.requestId, ErrorCategory.NOT_PAIRED, "targetNodeRef is not paired with this caller")
+    }
+    val nonce = params["nonce"]?.jsonPrimitive?.contentOrNull
+    if (nonce.isNullOrBlank() || !FleetProtocol.isValidNonce(nonce))
+        return err(req.requestId, ErrorCategory.INVALID_PARAMETERS, "nonce must be a 128-bit hex or UUID")
+    val timestampMs = params["timestampMs"]?.jsonPrimitive?.longOrNull
+    if (timestampMs == null)
+        return err(req.requestId, ErrorCategory.INVALID_PARAMETERS, "timestampMs is required")
+    val ttl =
+        try {
+          resolveTtlFromParams(params)
+        } catch (e: InvalidParametersException) {
+          return err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid ttlMs")
+        }
+    val now = clock()
+    if (isFutureSkew(timestampMs, now))
+        return err(req.requestId, ErrorCategory.EXPIRED, "timestampMs is more than 120s in the future")
+    if (isExpired(timestampMs, ttl, now))
+        return err(req.requestId, ErrorCategory.EXPIRED, "envelope expired")
+    if (nonceCache.seen(sourceNodeRef, nonce, now))
+        return err(req.requestId, ErrorCategory.REPLAY_DETECTED, "nonce has already been used")
+    return try {
+      if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
+      ok(req.requestId, nodeStatusResult(params))
+    } catch (e: InvalidParametersException) {
+      err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
     } catch (e: Exception) {
       err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
     }
@@ -579,7 +647,12 @@ class FleetDispatcher(
   ): BridgeResponse {
     if (env.actionRef.isBlank())
         throw InvalidParametersException("actionRef must be non-empty")
-    if (env.params.isNotEmpty() && env.actionRef != FleetProtocol.OP_NODE_STATUS)
+    if (env.actionRef == FleetProtocol.OP_NODE_STATUS) {
+      // Cheap compatible alias: already authenticated + replay-checked.
+      // Never enter confirmation gating.
+      return ok(env.requestId, nodeStatusResult(env.params))
+    }
+    if (env.params.isNotEmpty())
         throw InvalidParametersException("operation ${env.actionRef} takes no parameters")
     return outcomeToResponse(
         env.requestId,
@@ -712,6 +785,20 @@ class FleetDispatcher(
     if (cap == null) return ActionOutcome.Err(ErrorCategory.NOT_FOUND, "unknown actionRef $actionRef")
     if (!cap.remoteAllowed)
         return ActionOutcome.Err(ErrorCategory.CAPABILITY_OFF, "action $actionRef is not remotely allowed")
+    if (actionRef == FleetProtocol.OP_NODE_STATUS) {
+      if (!execute) {
+        return ActionOutcome.Ok(buildJsonObject { put("validated", true); put("actionRef", actionRef) })
+      }
+      return try {
+        ActionOutcome.Ok(nodeStatusResult(params))
+      } catch (e: InvalidParametersException) {
+        ActionOutcome.Err(ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+      } catch (e: ActionNotFound) {
+        ActionOutcome.Err(ErrorCategory.NOT_FOUND, e.message ?: "not found")
+      } catch (e: Exception) {
+        ActionOutcome.Err(ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+      }
+    }
     if (cap.kind == FleetProtocol.KIND_DESTRUCTIVE || cap.requiresConfirm) {
       if (!execute) {
         return ActionOutcome.Ok(
@@ -849,23 +936,27 @@ class FleetDispatcher(
     return NodeStatusSnapshotCodec.encode(snapshot)
   }
 
-  /** Empty args = this node. Optional args.nodeId must match this install. */
+  /**
+   * Optional `args.nodeId`. Unknown parameter (and args) keys are ignored for
+   * forward compatibility. Only a present but blank/malformed nodeId is
+   * `invalid_parameters`. A well-formed id for another node is `not_found`.
+   */
   private fun resolveStatusTarget(params: JsonObject) {
-    if (params.isEmpty()) return
-    if (params.keys != setOf("args")) {
-      throw InvalidParametersException("node.status.get accepts only optional args.nodeId")
-    }
-    val argsEl = params["args"] ?: return
-    val args = argsEl as? JsonObject ?: throw InvalidParametersException("args must be an object")
-    if (args.isEmpty()) return
-    if (args.keys != setOf("nodeId")) {
-      throw InvalidParametersException("node.status.get args accepts only nodeId")
-    }
-    val asked = args["nodeId"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+    val args = params["args"] as? JsonObject ?: return
+    val raw = args["nodeId"] ?: return
+    val asked = raw.jsonPrimitive.contentOrNull?.trim().orEmpty()
     if (asked.isBlank() || !FleetProtocol.isValidNodeId(asked)) {
       throw InvalidParametersException("args.nodeId is blank or malformed")
     }
     if (asked != nodeId) throw ActionNotFound("args.nodeId does not match this node")
+  }
+
+  private fun resolveTtlFromParams(params: JsonObject): Long {
+    val ttl = params["ttlMs"] ?: return FleetProtocol.DEFAULT_TTL_MS
+    val n = (ttl as? JsonPrimitive)?.longOrNull
+        ?: throw InvalidParametersException("ttlMs must be an integer")
+    if (n <= 0) throw InvalidParametersException("ttlMs must be positive")
+    return FleetProtocol.clampTtl(n)
   }
 
   private fun ok(id: String?, result: JsonObject) =

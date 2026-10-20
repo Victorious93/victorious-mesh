@@ -230,7 +230,15 @@ class FleetProtocolTest {
   @Test
   fun responsesCarryNoCredentialKeys() {
     for (op in FleetProtocol.OPERATIONS) {
-      val s = FleetProtocol.json.encodeToString(BridgeResponse.serializer(), call(req(op))).lowercase()
+      val raw =
+          if (op == FleetProtocol.OP_NODE_STATUS)
+              req(
+                  op,
+                  params =
+                      """{"nonce":"0123456789abcdef0123456789abcdef","timestampMs":1700000000000}""",
+              )
+          else req(op)
+      val s = FleetProtocol.json.encodeToString(BridgeResponse.serializer(), call(raw)).lowercase()
       for (bad in listOf("key", "auth", "token", "secret", "password", "credential")) {
         assertFalse("$op response contains '$bad': $s", s.contains("\"$bad") || s.contains("_$bad"))
       }

@@ -83,7 +83,7 @@ Still accepted. `parameters` must be `{}`.
 | `mesh.up` | Turns the mesh on | `requested: "up"` (the start is asynchronous; poll `mesh.status`). Refused if WireGuard mode is active. |
 | `mesh.down` | Turns the mesh off | `requested: "down"`. No-op if WireGuard mode is already active (the mesh is already down). Legacy `mesh.down` still runs immediately (backward compatible). The same action via `remote.command` is gated (see below). |
 | `mesh.ip.get` | This phone's mesh addresses | `ipv4`, `ipv6` (null if not connected) |
-| `node.status.get` | Status-tray snapshot for this node | `NodeStatusSnapshot` (see below). Optional `parameters.args.nodeId`. |
+| `node.status.get` | Status-tray snapshot for this node (canonical standalone read op) | `NodeStatusSnapshot` (see below). Envelope fields live in `parameters`. |
 
 ## Remote-control envelope v1.1
 
@@ -95,7 +95,7 @@ Top-level flat fields (camelCase):
 | `requestId` | Correlation id (reused as `request_id` on the response) |
 | `targetNodeRef` | This phone's node id |
 | `actionRef` | Mesh action for `remote.command` / `macro.step` (e.g. `mesh.status`) |
-| `params` | Must be `{}` for every mesh action |
+| `params` | Must be `{}` for mesh actions except the `node.status.get` alias, which may carry `args` and ignores unknown keys |
 | `nonce` | 128-bit unique value (32 hex chars, or a UUID) |
 | `timestampMs` | Epoch milliseconds |
 | `ttlMs` | Default `120000`, max `300000` (above max is **clamped**; `<= 0` is `invalid_parameters`) |
@@ -152,10 +152,17 @@ If notification permission is denied, the request is still
 
 ### `node.status.get` (status tray)
 
-Frozen STATUS-TRAY snapshot (`STATUS_TRAY.md`). Dispatch via
-`remote.command` (`actionRef: node.status.get`) or legacy
-`operation: node.status.get`. Same envelope auth (package+cert only),
-replay, and expiry as the other remote-control actions.
+Frozen STATUS-TRAY snapshot (`STATUS_TRAY.md`). **Canonical path** is a
+`BridgeRequest` with `operation: "node.status.get"` and the frozen v1.1
+envelope fields (`nonce`, `timestampMs`, `ttlMs`, `requestId`,
+`targetNodeRef`, …) inside `parameters` — not a top-level `op`. It is a
+standalone read-only Bridge op: same package+cert auth, replay, and
+expiry as remote control. It does **not** enter `remote.command`
+confirmation gating. External control matches other read ops
+(`mesh.status`): the Settings switch still applies.
+
+`remote.command` with `actionRef: "node.status.get"` is kept only as a
+cheap compatible alias (already replay-checked; never confirmation-gated).
 
 On success `result` is one camelCase `NodeStatusSnapshot`:
 
@@ -180,9 +187,10 @@ data — the codec refuses (`invalid_parameters`) rather than silently
 stripping. A down mesh or tunnel still answers `ok: true` with
 `state: "down"` (that is data, not an error).
 
-Optional `params.args.nodeId`: omit or match this node; a well-formed id
-for another node is `not_found`; blank or malformed is
-`invalid_parameters`.
+Optional `args.nodeId`: omit or match this node; a well-formed id for
+another node is `not_found`; blank or malformed is `invalid_parameters`.
+Unknown parameter (and `args`) keys are **ignored** for forward
+compatibility — they are not `invalid_parameters`.
 
 **[not device-verified]** Snapshot contents on a real phone have not been
 checked.

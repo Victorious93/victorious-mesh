@@ -9,6 +9,10 @@
   `applicationId` remains `com.victorious.mesh` for debug and release.
 - Versioning is inherited from upstream Tailscale (`mkversion` /
   `tailscale.version`) — an allowed fork exception, documented in README.
+- `node.status.get` canonical path is a standalone `BridgeRequest` with v1.1
+  envelope fields in `parameters` (auth / replay / expiry; no confirmation
+  gating). `remote.command` `actionRef` is a compatible alias. Unknown param
+  keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
 - Fleet `node.status.get` (STATUS-TRAY): `NodeStatusSnapshot` with mesh / vpn /
