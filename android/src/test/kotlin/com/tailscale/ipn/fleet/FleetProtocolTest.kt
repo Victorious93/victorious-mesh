@@ -176,6 +176,13 @@ class FleetProtocolTest {
   }
 
   @Test
+  fun downDoesNotStopWireGuardTunnel() {
+    val be = FakeBackend(wireGuard = true)
+    assertTrue(call(req("mesh.down"), be).ok)
+    assertEquals(0, be.downs)
+  }
+
+  @Test
   fun forTunnelModeIsIdentityInMeshMode() {
     val s = MeshStatus("Running", true, null, "100.64.0.1", null)
     assertEquals(s, s.forTunnelMode(false))

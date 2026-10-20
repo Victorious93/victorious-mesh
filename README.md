@@ -52,34 +52,46 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 and switch on **Allow fleet controller (droidcommand-AI)**.
 Full details, errors and examples: [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md).
 
-## WireGuard mode
+## WireGuard profiles
 
-Besides the mesh, the app can run a plain WireGuard tunnel from a standard
-wg-quick `.conf` file (for example one from a VPN provider or your own server).
+How to import and use a standard WireGuard tunnel instead of the mesh:
 
-- **Open it:** Settings → **WireGuard**.
-- **Add a profile:** **Import .conf** (system file picker), **Paste** the config text,
-  or **QR image** (pick a screenshot/photo of a WireGuard QR code). Profiles can be
-  renamed and deleted.
-- **Connect / disconnect:** tap **Connect** on a profile. The card at the top shows the
-  current tunnel mode (Mesh or WireGuard) and whether it is connected.
-- **One tunnel at a time.** Android allows one VPN per app, so the modes are mutually
-  exclusive. Connecting WireGuard turns the mesh off first; turning the mesh on (main
-  screen) turns WireGuard off first. **Switch back to mesh mode** returns to the mesh.
-- **What is used from the config:** `PrivateKey`, `Address`, `DNS` (IPs become DNS
-  servers, names become search domains), `MTU` (default 1280), `ListenPort`, and per
-  peer `PublicKey`, `PresharedKey`, `AllowedIPs` (installed as routes), `Endpoint`
-  (host names are resolved when connecting) and `PersistentKeepalive`. Linux-only
-  wg-quick keys (`PostUp`, `Table`, `FwMark`, ...) are ignored.
-- **Keys:** the whole config, including the private key, is stored only in the app's
-  EncryptedSharedPreferences (AES-256-GCM, master key in the Android Keystore). Keys are
-  never logged and never included in error messages.
-- **Fleet bridge:** no new operations. While WireGuard mode is active, `mesh.status`
-  reports the mesh as down (`connected: false`, no mesh IPs) and `mesh.up` is refused
-  until the user switches back to mesh mode in the app.
-- **How it works:** WireGuard runs inside the app's existing Go core using
-  `github.com/tailscale/wireguard-go` (MIT), on the same VpnService the mesh uses. No
-  second Go runtime and no extra native library is added.
+1. Open **Settings → WireGuard**.
+2. Add a profile:
+   - **Import .conf** — pick a wg-quick file from the system picker, or
+   - **Paste** — paste the `[Interface]` / `[Peer]` text, or
+   - **QR image** — pick a screenshot or photo of a WireGuard QR code.
+3. Rename or delete profiles from the card if you need to.
+4. Tap **Connect**. Approve the Android VPN permission if asked. The card at the
+   top shows **WireGuard · profile name** and **Connected**. The main screen also
+   shows a banner while this mode is up.
+5. Tap **Disconnect** to stop the tunnel, or **Switch back to mesh mode** to
+   return the app to the mesh. Connecting the mesh from the main screen also
+   turns WireGuard off first.
+
+**One tunnel at a time.** Android allows one VPN per app. Mesh and WireGuard
+never run together.
+
+**What is used from the config:** `PrivateKey` (base64 or 64-character hex),
+`Address`, `DNS` (IPs become DNS servers, names become search domains), `MTU`
+(default 1280), `ListenPort`, and per peer `PublicKey`, `PresharedKey`,
+`AllowedIPs` (installed as routes; at least one is required), `Endpoint` (host
+names are resolved when connecting) and `PersistentKeepalive`. Linux-only
+wg-quick keys (`PostUp`, `Table`, `FwMark`, …) are ignored. A full-tunnel config
+(`AllowedIPs = 0.0.0.0/0` or `::/0`) with no `DNS` gets Cloudflare public DNS
+so lookups are not sent into an empty resolver.
+
+**Keys:** the whole config, including the private key, is stored only in the
+app's EncryptedSharedPreferences (AES-256-GCM, master key in the Android
+Keystore). Keys are never logged and never included in error messages.
+
+**Fleet bridge:** no new operations. While WireGuard mode is active, `mesh.status`
+reports the mesh as down (`connected: false`, no mesh IPs) and `mesh.up` is
+refused until the user switches back to mesh mode in the app.
+
+**How it works:** WireGuard runs inside the app's existing Go core using
+`github.com/tailscale/wireguard-go` (MIT), on the same VpnService the mesh uses.
+No second Go runtime and no extra native library is added.
 
 ## Build and run
 

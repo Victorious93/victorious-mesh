@@ -22,6 +22,7 @@ import com.tailscale.ipn.UninitializedApp
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
+import com.tailscale.ipn.wireguard.WireGuardManager
 
 /** Persistent fleet settings: node id + external-control toggle (default OFF). */
 object FleetSettings {
@@ -50,8 +51,7 @@ object FleetSettings {
 
 /** MeshBackend backed by the in-process Notifier state flows and App start/stop paths. */
 class AppMeshBackend(private val ctx: Context) : MeshBackend {
-  override fun wireGuardModeActive(): Boolean =
-      com.tailscale.ipn.wireguard.WireGuardManager.isWireGuardActive()
+  override fun wireGuardModeActive(): Boolean = WireGuardManager.isWireGuardActive()
 
   override fun status(): MeshStatus {
     val state = Notifier.state.value

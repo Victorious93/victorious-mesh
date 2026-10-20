@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/netip"
 	"sync"
 
 	"github.com/tailscale/tailscale-android/libtailscale/wgquick"
@@ -76,8 +77,26 @@ func StartWireGuard(service IPNService, config string) (err error) {
 	defer wgState.mu.Unlock()
 	stopWireGuardLocked()
 
-	// Resolve endpoints before the tunnel captures traffic.
-	uapi, err := cfg.UAPI(wgquick.ResolveEndpoint)
+	// Resolve endpoints before the tunnel captures traffic, then reuse
+	// the results for UAPI and for ExcludeRoute (so handshake packets
+	// are not sent into 0.0.0.0/0 on API 33+ even if protect() fails).
+	resolved := make(map[string]netip.AddrPort)
+	for _, p := range cfg.Peers {
+		if p.Endpoint == "" {
+			continue
+		}
+		ap, err := wgquick.ResolveEndpoint(p.Endpoint)
+		if err != nil {
+			return fmt.Errorf("resolving endpoint %q: %w", p.Endpoint, err)
+		}
+		resolved[p.Endpoint] = ap
+	}
+	uapi, err := cfg.UAPI(func(s string) (netip.AddrPort, error) {
+		if ap, ok := resolved[s]; ok {
+			return ap, nil
+		}
+		return wgquick.ResolveEndpoint(s)
+	})
 	if err != nil {
 		return err
 	}
@@ -91,7 +110,7 @@ func StartWireGuard(service IPNService, config string) (err error) {
 			return err
 		}
 	}
-	for _, d := range cfg.DNSServers {
+	for _, d := range cfg.DNSForVPN() {
 		if err := b.AddDNSServer(d.String()); err != nil {
 			return err
 		}
@@ -104,6 +123,11 @@ func StartWireGuard(service IPNService, config string) (err error) {
 	for _, r := range cfg.Routes() {
 		if err := b.AddRoute(r.Addr().String(), int32(r.Bits())); err != nil {
 			return err
+		}
+	}
+	for _, ap := range resolved {
+		if err := b.ExcludeRoute(ap.Addr().String(), int32(ap.Addr().BitLen())); err != nil {
+			log.Printf("wireguard: excludeRoute(%s) failed: %v", ap.Addr(), err)
 		}
 	}
 	pfd, err := b.Establish()
@@ -136,17 +160,36 @@ func StartWireGuard(service IPNService, config string) (err error) {
 		dev.Close()
 		return fmt.Errorf("wireguard: up: %v", err)
 	}
-	// Keep the WireGuard UDP sockets out of our own tunnel.
-	if p, ok := bind.(socketFdPeeker); ok {
-		if fd4, err := p.PeekLookAtSocketFd4(); err == nil && !service.Protect(int32(fd4)) {
-			log.Printf("wireguard: protect(v4) failed")
-		}
-		if fd6, err := p.PeekLookAtSocketFd6(); err == nil && !service.Protect(int32(fd6)) {
-			log.Printf("wireguard: protect(v6) failed")
-		}
-	}
+	// Sockets exist only after Up (Bind.Open). Protect immediately so
+	// handshake packets are not captured by 0.0.0.0/0.
+	protectSockets(service, bind)
 	wgState.dev = dev
 	service.UpdateVpnStatus(true)
 	log.Printf("wireguard: up with %d peer(s), mtu %d", len(cfg.Peers), cfg.MTU)
 	return nil
+}
+
+func protectSockets(service IPNService, bind conn.Bind) {
+	p, ok := bind.(socketFdPeeker)
+	if !ok {
+		return
+	}
+	// PeekLookAtSocketFd* on StdNetBind dereferences ipv4/ipv6 with no
+	// nil check; recover so a missing family cannot tear the tunnel down.
+	peek := func(name string, fn func() (int, error)) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("wireguard: protect(%s): %v", name, rec)
+			}
+		}()
+		fd, err := fn()
+		if err != nil {
+			return
+		}
+		if !service.Protect(int32(fd)) {
+			log.Printf("wireguard: protect(%s) failed", name)
+		}
+	}
+	peek("v4", p.PeekLookAtSocketFd4)
+	peek("v6", p.PeekLookAtSocketFd6)
 }

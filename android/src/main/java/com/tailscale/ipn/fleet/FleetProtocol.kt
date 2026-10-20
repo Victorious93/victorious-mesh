@@ -241,7 +241,11 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
           buildJsonObject { put("requested", "up") }
         }
         FleetProtocol.OP_DOWN -> {
-          backend.down()
+          // WireGuard mode already reports the mesh as down; do not tear the
+          // WireGuard tunnel down from a mesh.down (no new fleet ops).
+          if (!backend.wireGuardModeActive()) {
+            backend.down()
+          }
           buildJsonObject { put("requested", "down") }
         }
         FleetProtocol.OP_IP_GET -> {

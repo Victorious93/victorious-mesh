@@ -30,9 +30,14 @@ func (k wgKey) hex() string { return hex.EncodeToString(k[:]) }
 
 func parseWGKey(s string) (wgKey, error) {
 	var k wgKey
-	b, err := base64.StdEncoding.DecodeString(strings.TrimSpace(s))
+	s = strings.TrimSpace(s)
+	if b, err := hex.DecodeString(s); err == nil && len(b) == 32 {
+		copy(k[:], b)
+		return k, nil
+	}
+	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil || len(b) != 32 {
-		return k, errors.New("key must be 32 bytes, base64-encoded")
+		return k, errors.New("key must be 32 bytes, base64- or hex-encoded")
 	}
 	copy(k[:], b)
 	return k, nil
@@ -240,13 +245,52 @@ func Parse(text string) (*Config, error) {
 	if len(cfg.Peers) == 0 {
 		return nil, errors.New("config has no [Peer]")
 	}
+	if len(cfg.Routes()) == 0 {
+		return nil, errors.New("config has no AllowedIPs (no routes to install)")
+	}
 	if cfg.MTU == 0 {
 		cfg.MTU = DefaultMTU
 	}
 	return cfg, nil
 }
 
-// routes returns the deduplicated union of all peers' AllowedIPs.
+// HasDefaultRoute reports whether any peer routes the IPv4 or IPv6 default.
+func (c *Config) HasDefaultRoute() (v4, v6 bool) {
+	for _, r := range c.Routes() {
+		if r.Bits() != 0 {
+			continue
+		}
+		if r.Addr().Is4() {
+			v4 = true
+		} else {
+			v6 = true
+		}
+	}
+	return v4, v6
+}
+
+// DNSForVPN is the nameserver list to install on the VpnService. If the config
+// is a full-tunnel (default route) and lists no DNS servers, Cloudflare public
+// DNS is used so lookups are not sent into a tunnel with no resolver.
+func (c *Config) DNSForVPN() []netip.Addr {
+	if len(c.DNSServers) > 0 {
+		return append([]netip.Addr(nil), c.DNSServers...)
+	}
+	v4, v6 := c.HasDefaultRoute()
+	if !v4 && !v6 {
+		return nil
+	}
+	var out []netip.Addr
+	if v4 {
+		out = append(out, netip.MustParseAddr("1.1.1.1"), netip.MustParseAddr("1.0.0.1"))
+	}
+	if v6 {
+		out = append(out, netip.MustParseAddr("2606:4700:4700::1111"))
+	}
+	return out
+}
+
+// Routes returns the deduplicated union of all peers' AllowedIPs.
 func (c *Config) Routes() []netip.Prefix {
 	seen := map[netip.Prefix]bool{}
 	var out []netip.Prefix

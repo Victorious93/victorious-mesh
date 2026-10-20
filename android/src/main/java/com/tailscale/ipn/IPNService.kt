@@ -55,9 +55,15 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           START_NOT_STICKY
         }
         ACTION_RESTART_VPN -> {
+          // Split-tunnel / package-list changes restart the current tunnel.
+          // Stay in WireGuard mode if that is what is running.
+          val wgProfile =
+              if (WireGuardManager.isWireGuardActive()) {
+                WireGuardManager.persistedWireGuardProfile()
+              } else null
           app.setWantRunning(false) {
             close()
-            app.startVPN()
+            if (wgProfile != null) WireGuardManager.connect(app, wgProfile) else app.startVPN()
           }
           START_NOT_STICKY
         }
@@ -246,6 +252,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     val b: Builder =
         Builder()
             .setConfigureIntent(configIntent())
+            .setBlocking(true)
             .allowFamily(OsConstants.AF_INET)
             .allowFamily(OsConstants.AF_INET6)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

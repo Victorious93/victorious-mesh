@@ -48,9 +48,9 @@ includes `node_id`, so the controller can learn it, e.g. via `mesh.capabilities.
 | Operation | What it does | Result |
 |---|---|---|
 | `mesh.capabilities.get` | Lists what this node supports | `operations`, `dca_required: false`, `fleet_class: "external_node"`, `protocol_major` |
-| `mesh.status` | Current state | `backend_state` (e.g. `Running`, `Stopped`, `NeedsLogin`), `connected`, `control_url`, `ips` |
-| `mesh.up` | Turns the mesh on | `requested: "up"` (the start is asynchronous; poll `mesh.status`) |
-| `mesh.down` | Turns the mesh off | `requested: "down"` |
+| `mesh.status` | Current state | `backend_state` (e.g. `Running`, `Stopped`, `NeedsLogin`), `connected`, `control_url`, `ips`. While a WireGuard profile is connected this reports the mesh down (`connected: false`, empty `ips`). |
+| `mesh.up` | Turns the mesh on | `requested: "up"` (the start is asynchronous; poll `mesh.status`). Refused if WireGuard mode is active. |
+| `mesh.down` | Turns the mesh off | `requested: "down"`. No-op if WireGuard mode is already active (the mesh is already down). |
 | `mesh.ip.get` | This phone's mesh addresses | `ipv4`, `ipv6` (null if not connected) |
 
 `parameters` must be `{}` for all of these.
@@ -66,7 +66,7 @@ includes `node_id`, so the controller can learn it, e.g. via `mesh.capabilities.
 | `node_mismatch` | `target_node_id` is not this phone. |
 | `unsupported_operation` | Unknown operation. |
 | `invalid_parameters` | Unexpected `parameters` or bad `timeout_ms`. |
-| `safety_refused` | `mesh.up` without VPN permission: the user must open the app once. |
+| `safety_refused` | `mesh.up` without VPN permission (the user must open the app once), or `mesh.up` while WireGuard mode is active (the user must switch back to mesh mode in the app). |
 | `internal` | Something went wrong inside the app. |
 
 (`verify_failed` is part of the shared spec but is not produced by this node.)

@@ -11,6 +11,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BinaryBitmap
@@ -56,6 +58,7 @@ import com.tailscale.ipn.wireguard.TunnelMode
 import com.tailscale.ipn.wireguard.WireGuardManager
 import com.tailscale.ipn.wireguard.WireGuardProfile
 import com.tailscale.ipn.wireguard.WireGuardProfileStore
+import java.io.ByteArrayOutputStream
 import libtailscale.Libtailscale
 
 private const val TAG = "WireGuardView"
@@ -72,7 +75,7 @@ private fun validate(conf: String): String? =
 
 private fun readText(ctx: Context, uri: Uri): String? =
     ctx.contentResolver.openInputStream(uri)?.use { s ->
-      val out = java.io.ByteArrayOutputStream()
+      val out = ByteArrayOutputStream()
       val buf = ByteArray(8192)
       while (true) {
         val n = s.read(buf)
@@ -106,7 +109,10 @@ private fun decodeQr(ctx: Context, uri: Uri): String? =
 @Composable
 fun WireGuardView(onBack: () -> Unit) {
   val ctx = LocalContext.current
-  val store = remember { WireGuardManager.store() }
+  val store = remember {
+    WireGuardManager.load()
+    WireGuardManager.store()
+  }
   var profiles by remember { mutableStateOf(store.list()) }
   val state by WireGuardManager.state.collectAsState()
   val lastError by WireGuardManager.lastError.collectAsState()
@@ -283,6 +289,37 @@ fun WireGuardView(onBack: () -> Unit) {
 @Composable
 private fun neonBrush() =
     Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))
+
+@Composable
+fun WireGuardActiveBanner(onOpen: () -> Unit) {
+  Card(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable { onOpen() },
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+  ) {
+    Box(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(neonBrush())
+            .padding(2.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(16.dp),
+    ) {
+      Column {
+        Text(
+            stringResource(R.string.wireguard_active_banner_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            stringResource(R.string.wireguard_active_banner_body),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+      }
+    }
+  }
+}
 
 @Composable
 fun ModeIndicator(mode: TunnelMode, running: Boolean, profileName: String?) {

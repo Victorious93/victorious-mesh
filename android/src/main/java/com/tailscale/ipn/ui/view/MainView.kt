@@ -116,6 +116,8 @@ import com.tailscale.ipn.ui.viewModel.AppViewModel
 import com.tailscale.ipn.ui.viewModel.IpnViewModel.NodeState
 import com.tailscale.ipn.ui.viewModel.MainViewModel
 import com.tailscale.ipn.util.FeatureFlags
+import com.tailscale.ipn.wireguard.TunnelMode
+import com.tailscale.ipn.wireguard.WireGuardManager
 import kotlinx.coroutines.flow.emptyFlow
 
 // Navigation actions for the MainView
@@ -126,6 +128,7 @@ data class MainViewNavigation(
     val onNavigateToHealth: () -> Unit,
     val onNavigateToSearch: () -> Unit,
     val onNavigateToControlServer: () -> Unit = {},
+    val onNavigateToWireGuard: () -> Unit = {},
 )
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -155,6 +158,7 @@ fun MainView(
         val disableToggle by MDMSettings.forceEnabled.flow.collectAsState()
         val isToggleInProgress by viewModel.isToggleInProgress.collectAsState()
         val showKeyExpiry by viewModel.showExpiry.collectAsState()
+        val wgState by WireGuardManager.state.collectAsState()
 
         val hideHeader = (isAndroidTV() && state == Ipn.State.NeedsLogin)
         ListItem(
@@ -217,6 +221,9 @@ fun MainView(
               }
             },
         )
+        if (wgState.running && wgState.mode == TunnelMode.WIREGUARD) {
+          WireGuardActiveBanner(onOpen = navigation.onNavigateToWireGuard)
+        }
         when (state) {
           Ipn.State.Running -> {
             viewModel.maybeRequestVpnPermission()

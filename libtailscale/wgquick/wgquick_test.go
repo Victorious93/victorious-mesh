@@ -99,6 +99,7 @@ func TestParseInvalid(t *testing.T) {
 		"missing priv":    "[Interface]\nAddress = 10.0.0.2/32\n" + peer,
 		"missing address": "[Interface]\nPrivateKey = " + tPriv + "\n" + peer,
 		"no peer":         iface,
+		"no allowedips":   iface + "[Peer]\nPublicKey = " + tPub1 + "\n",
 		"peer no pubkey":  iface + "[Peer]\nAllowedIPs = 0.0.0.0/0\n",
 		"bad key":         "[Interface]\nPrivateKey = notakey\nAddress = 10.0.0.2/32\n" + peer,
 		"bad address":     "[Interface]\nPrivateKey = " + tPriv + "\nAddress = 10.0.0.300/32\n" + peer,
@@ -115,5 +116,66 @@ func TestParseInvalid(t *testing.T) {
 		} else if strings.Contains(err.Error(), tPriv) {
 			t.Errorf("%s: error leaks key", name)
 		}
+	}
+}
+
+func TestParseListenPortHexKeyAndComments(t *testing.T) {
+	hexPriv := "c809f3e5317e9575c9b5ed78b638b7ce530dabe85ddab614220241801ddf0669"
+	c, err := Parse(`[Interface]
+PrivateKey = ` + hexPriv + ` # local
+Address = 10.0.0.2/32 # tunnel addr
+DNS = 2001:4860:4860::8888
+ListenPort = 51820
+[Peer]
+PublicKey = ` + tPub1 + `
+AllowedIPs = 10.8.0.0/24
+Endpoint = 203.0.113.9:51820 # pop
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ListenPort != 51820 || len(c.DNSServers) != 1 || !c.DNSServers[0].Is6() {
+		t.Fatalf("listen=%d dns=%v", c.ListenPort, c.DNSServers)
+	}
+	u, err := c.UAPI(fakeResolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(u, "listen_port=51820") || !strings.Contains(u, "private_key=c809f3e5") {
+		t.Errorf("uapi: %s", u)
+	}
+}
+
+func TestDNSForVPNFallbackOnFullTunnel(t *testing.T) {
+	full, err := Parse(`[Interface]
+PrivateKey = ` + tPriv + `
+Address = 10.0.0.2/32
+[Peer]
+PublicKey = ` + tPub1 + `
+AllowedIPs = 0.0.0.0/0, ::/0
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dns := full.DNSForVPN()
+	if len(dns) != 3 {
+		t.Fatalf("fallback dns: %v", dns)
+	}
+	split, err := Parse(`[Interface]
+PrivateKey = ` + tPriv + `
+Address = 10.0.0.2/32
+[Peer]
+PublicKey = ` + tPub1 + `
+AllowedIPs = 10.8.0.0/24
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := split.DNSForVPN(); len(got) != 0 {
+		t.Fatalf("split-tunnel should not invent DNS: %v", got)
+	}
+	v4, v6 := full.HasDefaultRoute()
+	if !v4 || !v6 {
+		t.Fatalf("default routes v4=%v v6=%v", v4, v6)
 	}
 }
