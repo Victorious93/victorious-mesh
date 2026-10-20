@@ -67,7 +67,7 @@ func (t *forcedTUN) Read(slab []byte, packets []tun.ReadPacket) (int, error) {
 		}
 		kept := 0
 		for i := 0; i < n; i++ {
-			raw := readPacketBytes(packets[i])
+			raw := readPacketBytes(slab, packets[i])
 			if upstreamproxy.IsMeshDest(raw) {
 				if kept != i {
 					packets[kept] = packets[i]
@@ -83,6 +83,10 @@ func (t *forcedTUN) Read(slab []byte, packets []tun.ReadPacket) (int, error) {
 	}
 }
 
-func readPacketBytes(p tun.ReadPacket) []byte {
-	return p.Packet
+func readPacketBytes(slab []byte, p tun.ReadPacket) []byte {
+	end := p.Offset + p.Size
+	if p.Offset < 0 || p.Size < 0 || end > len(slab) {
+		return nil
+	}
+	return slab[p.Offset:end]
 }
