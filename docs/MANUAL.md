@@ -8,7 +8,7 @@ This is the guide for the Victorious Mesh app on your phone. Screenshots are not
 
 Victorious Mesh is the VPN on this phone. It joins Don's private network, which is run by a Headscale server he hosts himself. Once it is connected, your phone can reach the other devices on that network, and other fleet apps on this phone ride the same private path.
 
-Android only allows **one** VPN at a time. Victorious Mesh takes that single VPN slot. If another VPN app is already on, this one cannot start until you turn the other one off.
+Android only allows **one** VPN at a time. Victorious Mesh takes that single VPN slot. If another VPN app is already on, this one cannot start until you turn the other one off. Inside this app, the **mesh** and a **WireGuard profile** also cannot run together — connecting one turns the other off.
 
 In the fleet, this app is an **external node**. The controller app **droidcommand-AI** (`ai.droidcommand.app`) can look at status and turn the mesh on or off — but only after you switch that on in Settings. Other fleet apps do not run their own VPN; they use this one.
 
@@ -112,6 +112,28 @@ Use **Enable** / **Disable** on the main-screen exit node row to turn the chosen
 - See whether mesh DNS is on, plus resolvers, search domains, and split DNS routes (tap a value to copy it).
 - **Use Victorious Mesh DNS** turns mesh DNS on or off, unless a work policy hides the switch.
 
+### WireGuard
+
+![WireGuard](images/manual/wireguard.png)
+
+*Screenshot pending.*
+
+You can run a standard WireGuard tunnel **instead of** the mesh. They never run at the same time.
+
+1. Open **Settings → WireGuard**.
+2. At the top, a **mode banner** shows **Tunnel mode**: **Mesh** or **WireGuard · profile name**, plus **Connected** or **Disconnected**.
+3. Add a profile in one of three ways:
+   - **Import .conf** — pick a wg-quick file from the system picker.
+   - **Paste** — paste the `[Interface]` / `[Peer]` text (you can give it a name).
+   - **QR image** — pick a screenshot or photo of a WireGuard QR code.
+4. On each profile card you can **Rename**, **Delete**, or **Connect**. Delete asks you to confirm and removes the profile and its keys from this phone. If that profile is the one currently connected, it is disconnected first.
+5. Tap **Connect**. Approve the Android VPN permission if asked. The mode banner shows **WireGuard · profile name** and **Connected**. The main screen also shows a banner: **WireGuard is connected** — *The mesh is off. Open WireGuard profiles to disconnect or switch back.* Tap that banner to return to this screen.
+6. Tap **Disconnect** on the active card to stop the tunnel, or **Switch back to mesh mode** to return the app to the mesh. Connecting the mesh from the main screen also turns WireGuard off first.
+
+**One tunnel at a time.** Android allows one VPN. Mesh and WireGuard never run together.
+
+While a WireGuard profile is connected, the fleet controller sees the **mesh as down** (not connected, no mesh IPs). Asking it to turn the mesh on (`mesh.up`) is **refused** until you switch back to mesh mode in the app. Turning the mesh off remotely does nothing extra in this mode, because the mesh is already off.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -181,7 +203,6 @@ This manual is also in the app: tap **Help** on the main screen, or **Settings �
 
 These are **not** in the app yet:
 
-- **WireGuard profiles** — importing or switching extra WireGuard configs
 - **Ad blocker**
 - **OpenWRT router dashboard**
 
@@ -213,7 +234,9 @@ The controller **droidcommand-AI** (`ai.droidcommand.app`) can:
 - Turn the mesh **off**
 - Read this phone's mesh IPv4 and IPv6
 
-It cannot read keys, auth keys, or other secrets. It cannot change the Headscale URL or log you in.
+It cannot read keys, auth keys, or other secrets. It cannot change the Headscale URL or log you in. It cannot start or stop a WireGuard profile.
+
+**While WireGuard mode is on:** `mesh.status` reports the mesh as down (`connected: false`, no mesh IPs). `mesh.up` is refused until you switch back to mesh mode in the app. `mesh.down` does not tear down the WireGuard tunnel.
 
 ### External control is off by default
 
@@ -239,8 +262,8 @@ Anything else is rejected. Victorious Mesh is signed with its **own** key; it do
 Remote control is gated on this phone:
 
 - **Allowing control** is an on-phone Settings switch. Nothing remote can turn that switch on for you.
-- **Turning the mesh on** from the controller is refused until you have opened this app and accepted the Android VPN permission dialog. That system dialog is the on-phone confirmation for handing the VPN slot to Victorious Mesh.
-- **Turning the mesh off** from the controller, once the switch is on and the caller is allowlisted, happens without a second pop-up. If you do not want the controller to stop the mesh, turn **Allow fleet controller** off.
+- **Turning the mesh on** from the controller is refused until you have opened this app and accepted the Android VPN permission dialog. That system dialog is the on-phone confirmation for handing the VPN slot to Victorious Mesh. It is also refused while a WireGuard profile is connected — you must tap **Switch back to mesh mode** (or disconnect WireGuard) on the phone first.
+- **Turning the mesh off** from the controller, once the switch is on and the caller is allowlisted, happens without a second pop-up. If WireGuard is already running, that request does not stop the WireGuard tunnel. If you do not want the controller to stop the mesh, turn **Allow fleet controller** off.
 
 There is no extra in-app “Type yes to confirm” step beyond VPN permission and the Settings switch.
 
@@ -258,13 +281,15 @@ There is no extra in-app “Type yes to confirm” step beyond VPN permission an
 
 **Mesh Drop will not save files.** Pick a Mesh Drop directory under **Settings → Permissions**. On older Android, allow storage.
 
-**The fleet controller cannot connect.** Turn on **Allow fleet controller (droidcommand-AI)**. Confirm droidcommand-AI is the signed package on the allowlist. The controller must use this install's node id (`mesh-` plus 32 hex characters). If you never granted VPN permission, turning the mesh on remotely is refused.
+**The fleet controller cannot connect.** Turn on **Allow fleet controller (droidcommand-AI)**. Confirm droidcommand-AI is the signed package on the allowlist. The controller must use this install's node id (`mesh-` plus 32 hex characters). If you never granted VPN permission, turning the mesh on remotely is refused. If a WireGuard profile is connected, the controller sees the mesh as down and cannot turn the mesh on until you switch back to mesh mode.
 
 **I turned the controller off but I still see a VPN.** The Settings switch only blocks *remote* control. Use the main-screen switch (or the Quick Settings tile) to stop the VPN yourself.
 
-**Can I use this with a second VPN app?** Not at the same time. Android allows one VPN.
+**Can I use this with a second VPN app?** Not at the same time. Android allows one VPN. Mesh and WireGuard inside this app also cannot run together.
 
-**Is there a WireGuard profile importer, ad blocker, or router dashboard?** Not yet — see **Coming soon**.
+**The mesh will not start, and I use WireGuard.** Open **Settings → WireGuard** and tap **Switch back to mesh mode** (or **Disconnect**), then connect the mesh from the main screen.
+
+**Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 
 **Debug vs release.** Debug builds from CI share a fixed debug signature. Release builds use a separate key that is not stored in the project.
 
@@ -272,7 +297,7 @@ There is no extra in-app “Type yes to confirm” step beyond VPN permission an
 
 - **Diagnostic log upload is disabled.** The app does not send diagnostic logs to a remote log server. That path is switched off in the build (always reports logging as off; remote upload cannot be turned on). Logs that the VPN core writes stay on the device.
 - **There is no in-app bug-report upload.** The old report screen is not linked from Settings, because it targeted that remote log server.
-- **Keys stay on this device.** Login and node keys are stored in encrypted app storage. Extra hardware-backed keys use the Android Keystore when the phone supports it. Auth keys you paste are handed to the local VPN engine for login; they are not written to the Control server preference. Android backup for this app is off, so those secrets are not copied to cloud backup.
+- **Keys stay on this device.** Login and node keys are stored in encrypted app storage. Extra hardware-backed keys use the Android Keystore when the phone supports it. Auth keys you paste are handed to the local VPN engine for login; they are not written to the Control server preference. WireGuard configs, including private keys, stay in the same encrypted on-device store and are not written to logs or error messages. Android backup for this app is off, so those secrets are not copied to cloud backup.
 - **The fleet bridge** returns status and IP addresses only — never keys, tokens, or file contents.
 - **What the intro text still says.** The first-run paragraph mentions that a name, device name, OS version, and IP are used to connect devices. That text is shown in the app; this build does not upload diagnostic logs, and your Headscale server is the control plane you configured.
 - **Licensing.** Victorious Mesh is a modified open-source client (BSD-3-Clause). Credit to the original authors belongs in the license files (`LICENSE`, `NOTICE`, `PATENTS`) and on the About screen. This app is not affiliated with or endorsed by those original authors.
