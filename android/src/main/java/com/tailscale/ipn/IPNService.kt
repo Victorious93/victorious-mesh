@@ -13,6 +13,9 @@ import android.system.OsConstants
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
+import com.tailscale.ipn.routing.PerAppPlanner
+import com.tailscale.ipn.routing.PerAppStore
+import com.tailscale.ipn.wireguard.EncryptedPrefsSecretStore
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
@@ -298,7 +301,16 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       // via Tailscale
       packagesList = UninitializedApp.get().selectedPackageNames()
       allowPackages = UninitializedApp.get().allowSelectedPackages()
-      TSLog.d(TAG, "Application packages were set by user: $packagesList")
+      val perApp =
+          PerAppPlanner.mergeSplitTunnel(
+              splitSelected = packagesList,
+              allowSelected = allowPackages,
+              directPackages = PerAppStore(EncryptedPrefsSecretStore(app.getEncryptedPrefs())).routes()
+                  .let { PerAppPlanner.directPackages(it) },
+          )
+      packagesList = perApp.packages
+      allowPackages = perApp.allowPackages
+      TSLog.d(TAG, "Application packages were set by user: $packagesList (${perApp.reason})")
     }
 
     packagesList =

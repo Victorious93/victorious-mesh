@@ -98,6 +98,7 @@ import com.tailscale.ipn.ui.view.TaildropDirectoryPickerPrompt
 import com.tailscale.ipn.ui.view.TailnetLockSetupView
 import com.tailscale.ipn.ui.view.UserSwitcherNav
 import com.tailscale.ipn.ui.view.UserSwitcherView
+import com.tailscale.ipn.ui.view.PerAppRoutingView
 import com.tailscale.ipn.ui.view.ProxyView
 import com.tailscale.ipn.ui.view.WireGuardView
 import com.tailscale.ipn.ui.viewModel.AppViewModel
@@ -345,6 +346,7 @@ class MainActivity : ComponentActivity() {
                       onNavigateToControlServer = { navController.navigate("controlServer") },
                       onNavigateToWireGuard = { navController.navigate("wireguard") },
                       onNavigateToProxy = { navController.navigate("proxy") },
+                      onNavigateToPerAppRouting = { navController.navigate("perAppRouting") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -432,6 +434,7 @@ class MainActivity : ComponentActivity() {
               composable("about") { AboutView(backTo("settings")) }
               composable("wireguard") { WireGuardView(backTo("settings")) }
               composable("proxy") { ProxyView(backTo("settings")) }
+              composable("perAppRouting") { PerAppRoutingView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(
