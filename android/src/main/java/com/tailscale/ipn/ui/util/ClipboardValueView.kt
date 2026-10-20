@@ -25,7 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 
 @Composable
 fun ClipboardValueView(value: String, title: String? = null, subtitle: String? = null) {

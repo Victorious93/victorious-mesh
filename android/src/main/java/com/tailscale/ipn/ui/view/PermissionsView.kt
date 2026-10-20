@@ -19,7 +19,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.model.Permissions
 import com.tailscale.ipn.ui.util.friendlyDirName
 import com.tailscale.ipn.ui.util.itemsWithDividers

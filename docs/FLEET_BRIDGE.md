@@ -42,7 +42,12 @@ Victorious Mesh itself is signed with its own, separate release key.
 ## How it talks
 
 - Bind to the service with intent action `com.victorious.mesh.action.BRIDGE`
-  (package `com.victorious.mesh`).
+  (package `com.victorious.mesh`; debug and release share that
+  `applicationId`). There is no `FileProvider` / `android:authorities` in this
+  app. Manifest component names are fully qualified `com.tailscale.ipn.*` so
+  they stay valid after the Gradle namespace change (`com.victorious.mesh`).
+  Kotlin sources remain `com.tailscale.ipn` (gomobile / upstream-merge
+  deferral; see README).
 - Send a `Message` with `what = 1`, a Bundle with key `"request"` holding a JSON string,
   and `replyTo` set to your own Messenger.
 - The answer comes back as `what = 2`, Bundle key `"response"` (JSON string).

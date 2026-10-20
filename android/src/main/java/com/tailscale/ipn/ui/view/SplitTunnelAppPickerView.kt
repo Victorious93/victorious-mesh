@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tailscale.ipn.App
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.util.Lists
 import com.tailscale.ipn.ui.util.set
 import com.tailscale.ipn.ui.viewModel.SplitTunnelAppPickerViewModel

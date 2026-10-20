@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+- Gradle `namespace` is `com.victorious.mesh` (`R` / `BuildConfig`). Kotlin
+  sources stay `com.tailscale.ipn` (gomobile `libtailscale` + upstream-merge
+  deferral; documented in README and MANUAL troubleshooting).
+  `applicationId` remains `com.victorious.mesh` for debug and release.
+- Versioning is inherited from upstream Tailscale (`mkversion` /
+  `tailscale.version`) — an allowed fork exception, documented in README.
+
 ### Added
 - **WireGuard tunnel mode.** Import a wg-quick `.conf` (file, paste or QR image), manage
   profiles (rename/delete), and connect a standard WireGuard tunnel instead of the mesh.

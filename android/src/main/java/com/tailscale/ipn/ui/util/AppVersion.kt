@@ -3,7 +3,7 @@
 
 package com.tailscale.ipn.ui.util
 
-import com.tailscale.ipn.BuildConfig
+import com.victorious.mesh.BuildConfig
 
 class AppVersion {
   companion object {

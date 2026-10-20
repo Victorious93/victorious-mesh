@@ -34,7 +34,7 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 **droidcommand-AI** (`ai.droidcommand.app`) drives it:
 
 - **Transport:** an Android Messenger bridge, intent action
-  `com.victorious.mesh.action.BRIDGE`.
+  `com.victorious.mesh.action.BRIDGE` (package `com.victorious.mesh`).
 - **Protocol:** the shared fleet JSON envelope, `protocol_major` 1, `protocol_minor` 1
   (remote-control envelope plus backward-compatible `mesh.*` ops).
 - **Pairing:** by package name + signing-certificate SHA-256, checked on this side.
@@ -116,6 +116,41 @@ cd android
 
 Or skip the local build: every CI run uploads the debug APK as the
 **`victorious-mesh-debug-apk`** artifact on the GitHub Actions run page.
+
+## Versioning
+
+`versionName` / `versionCode` are inherited from upstream Tailscale
+(`tailscale.com/cmd/mkversion` writes `tailscale.version`; Gradle reads
+`VERSION_LONG`). This is an **allowed fork exception**: Victorious Mesh does
+not keep a separate version scheme. The Play/install `applicationId` remains
+`com.victorious.mesh` and is not inherited.
+
+## Android packages (fleet audit)
+
+| What | Value | Notes |
+|---|---|---|
+| `applicationId` | `com.victorious.mesh` | Play / install id for debug and release. **Never change this.** |
+| Gradle `namespace` | `com.victorious.mesh` | `R` and `BuildConfig` are generated here. |
+| Kotlin/Java source package | `com.tailscale.ipn.*` | **Deferred.** See below. |
+| Fleet bridge action | `com.victorious.mesh.action.BRIDGE` | Frozen string. |
+
+### Why the Kotlin package was not moved
+
+A full `com.tailscale.ipn` → `com.victorious.mesh` source move is deferred:
+
+- The Go core is bound with gomobile as Java package `libtailscale` (see
+  `scripts/build-aar.sh`). `App` implements `libtailscale.AppContext`. The Go
+  side comments on `com.tailscale.ipn.App` as the app context; there is no
+  `FindClass("com/tailscale/ipn/...")`, but renaming hundreds of Kotlin/Java
+  files risks a silent interface / JNI break and a large upstream-merge
+  conflict with tailscale-android.
+- Manifest components use fully qualified `com.tailscale.ipn.*` names so they
+  stay valid after the Gradle namespace change. There is no `FileProvider` /
+  `android:authorities` that needs `${applicationId}`.
+
+Safe in this change: Gradle `namespace`, `R` / `BuildConfig` imports, FQCN
+manifest names, ProGuard keep for `com.victorious.mesh.R` / `BuildConfig`.
+The committed debug keystore is unchanged; no release keys are added.
 
 ## Signing
 

@@ -3,7 +3,7 @@
 
 package com.tailscale.ipn.ui.util
 
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.util.TSLog
 import java.time.Duration
 import java.time.Instant

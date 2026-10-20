@@ -6,9 +6,13 @@
 # Keep Tailscale classes for debuggability, but especially
 # keep the classes with syspolicy MDM keys, some of which
 # get used only by the Go backend. (The second rule is redundant,
-# but explicit.)
+# but explicit.) Kotlin sources remain com.tailscale.ipn; R and
+# BuildConfig are generated under the Gradle namespace.
 -keep class com.tailscale.ipn.** { *; }
 -keep class com.tailscale.ipn.mdm.** { *; }
+-keep class com.victorious.mesh.R { *; }
+-keep class com.victorious.mesh.R$* { *; }
+-keep class com.victorious.mesh.BuildConfig { *; }
 
 # Keep specific classes from Tink library
 -keep class com.google.crypto.tink.** { *; }

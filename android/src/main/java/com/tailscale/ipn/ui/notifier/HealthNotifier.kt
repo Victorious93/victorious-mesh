@@ -8,7 +8,7 @@ import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.tailscale.ipn.App
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.UninitializedApp.Companion.notificationManager
 import com.tailscale.ipn.ui.model.Health
 import com.tailscale.ipn.ui.model.Health.UnhealthyState

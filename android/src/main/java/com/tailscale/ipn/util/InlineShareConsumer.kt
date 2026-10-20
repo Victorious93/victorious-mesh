@@ -10,7 +10,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.documentfile.provider.DocumentFile
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 
 // Acting on an inline share: URL opens the browser, text goes to the clipboard, with the
 // saved file as the fallback for both. Shared by the notification receiver and the UI so

@@ -9,6 +9,8 @@ import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 
+import com.victorious.mesh.R;
+
 public class QuickToggleService extends TileService {
     // lock protects the static fields below it.
     private static final Object lock = new Object();

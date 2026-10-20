@@ -13,7 +13,7 @@ import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.shouldShowRationale
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 
 object Permissions {
   /** Permissions to prompt for on MainView. */

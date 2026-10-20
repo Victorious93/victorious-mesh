@@ -6,7 +6,7 @@ package com.tailscale.ipn.ui.util
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 
 // Convenience wrapper for passing formatted strings to Composables
 class ComposableStringFormatter(

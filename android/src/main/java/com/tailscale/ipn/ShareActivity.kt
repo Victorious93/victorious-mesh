@@ -26,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.theme.AppTheme
 import com.tailscale.ipn.ui.util.set

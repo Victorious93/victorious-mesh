@@ -6,6 +6,7 @@ package com.tailscale.ipn
 import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
+import com.victorious.mesh.R
 import com.tailscale.ipn.UninitializedApp.Companion.STATUS_CHANNEL_ID
 
 internal fun workerForegroundInfo(): ForegroundInfo {

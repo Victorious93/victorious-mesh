@@ -13,7 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.tailscale.ipn.App
 import com.tailscale.ipn.InlineShareActionReceiver
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.util.InlineShare
 import com.tailscale.ipn.util.PendingInlineShare
 import com.tailscale.ipn.util.TSLog

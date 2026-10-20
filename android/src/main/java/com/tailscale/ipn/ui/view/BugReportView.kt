@@ -25,7 +25,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.Links
 import com.tailscale.ipn.ui.theme.defaultTextColor
 import com.tailscale.ipn.ui.theme.link

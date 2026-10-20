@@ -38,7 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.theme.onWarning
 import com.tailscale.ipn.ui.theme.warning
 import com.tailscale.ipn.ui.viewModel.PendingTaildropViewModel

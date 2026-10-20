@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.mdm.MDMSetting
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.ui.util.itemsWithDividers

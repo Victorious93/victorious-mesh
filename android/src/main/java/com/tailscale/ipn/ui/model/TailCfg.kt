@@ -6,7 +6,7 @@ package com.tailscale.ipn.ui.model
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.tailscale.ipn.R
+import com.victorious.mesh.R
 import com.tailscale.ipn.ui.Links
 import com.tailscale.ipn.ui.theme.off
 import com.tailscale.ipn.ui.theme.on
