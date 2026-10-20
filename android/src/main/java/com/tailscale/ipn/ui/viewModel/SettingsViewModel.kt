@@ -34,6 +34,7 @@ data class SettingsNav(
     val onNavigateToKillSwitch: () -> Unit = {},
     val onNavigateToAutoConnect: () -> Unit = {},
     val onNavigateToLeakChecker: () -> Unit = {},
+    val onNavigateToVictorGps: () -> Unit = {},
 )
 
 class SettingsViewModel : IpnViewModel() {

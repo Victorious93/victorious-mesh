@@ -103,6 +103,7 @@ import com.tailscale.ipn.autoconnect.AutoConnectEvent
 import com.tailscale.ipn.ui.view.AutoConnectView
 import com.tailscale.ipn.ui.view.KillSwitchView
 import com.tailscale.ipn.ui.view.LeakCheckerView
+import com.tailscale.ipn.ui.view.VictorGpsView
 import com.tailscale.ipn.ui.view.PerAppRoutingView
 import com.tailscale.ipn.ui.view.ProxyView
 import com.tailscale.ipn.ui.view.WireGuardView
@@ -356,6 +357,7 @@ class MainActivity : ComponentActivity() {
                       onNavigateToKillSwitch = { navController.navigate("killSwitch") },
                       onNavigateToAutoConnect = { navController.navigate("autoConnect") },
                       onNavigateToLeakChecker = { navController.navigate("leakChecker") },
+                      onNavigateToVictorGps = { navController.navigate("victorGps") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -447,6 +449,7 @@ class MainActivity : ComponentActivity() {
               composable("killSwitch") { KillSwitchView(backTo("settings")) }
               composable("autoConnect") { AutoConnectView(backTo("settings")) }
               composable("leakChecker") { LeakCheckerView(backTo("settings")) }
+              composable("victorGps") { VictorGpsView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(

@@ -251,6 +251,22 @@ The report covers this app only:
 
 **Limits.** This cannot prove other apps are leak-free. WebRTC/STUN, IPv6 bypass, and sockets opened before the VPN are not tested. There is **no fleet operation** for this.
 
+### VictorGPS stub
+
+![VictorGPS stub](images/manual/victorgps.png)
+
+*Screenshot pending.*
+
+**Settings → VictorGPS stub**
+
+**Off by default.** **[not device-verified]**
+
+This is a **local room profile** only (latitude, longitude, optional target-app package), matching the profile shape in Victorious93/victorgps PR #1. It does **not** mock GPS. VictorSpoof owns mock location.
+
+Expected pairing app: `com.victorious.gps`. Debug cert SHA-256 `38:AE:B4:F2:B9:A6:40:C5:46:FB:5D:DC:45:EA:79:BE:8E:89:BC:2C:76:9D:3C:87:B6:4B:F9:7A:27:B0:38:49`. Release cert TBD.
+
+**Not on the fleet allowlist.** VictorGPS cannot call the fleet bridge. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
