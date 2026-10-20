@@ -277,7 +277,7 @@ The controller can send a newer kind of request on the same bridge. In plain lan
 - The command must name this phone. A blank or badly formed name is rejected as invalid. A well-formed name for some other phone is treated as not found. This phone, if the sender is not paired with it, is rejected as not paired.
 - The phone decides who is allowed by looking at which app sent the message and how that app is signed. Fields inside the message never grant access.
 
-The controller binds this app by **installed package** plus the frozen action `com.victorious.mesh.action.BRIDGE`. A debug build installs as `com.victorious.mesh.debug`; release stays `com.victorious.mesh`. The action does not pick up the `.debug` suffix.
+The controller binds this app by package `com.victorious.mesh` plus the action `com.victorious.mesh.action.BRIDGE`. Debug and release share that package.
 
 Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDGE.md).
 
@@ -297,11 +297,9 @@ Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDG
 
 **Mesh Drop will not save files.** Pick a Mesh Drop directory under **Settings → Permissions**. On older Android, allow storage.
 
-**The fleet controller cannot connect.** Turn on **Allow fleet controller (droidcommand-AI)**. Confirm droidcommand-AI is the signed package on the allowlist. The controller must use this install's node id (`mesh-` plus 32 hex characters). Bind the package that is actually installed: release is `com.victorious.mesh`, a debug APK is `com.victorious.mesh.debug`. The bridge action is always `com.victorious.mesh.action.BRIDGE` and does **not** pick up the `.debug` suffix. If you never granted VPN permission, turning the mesh on remotely is refused. If a WireGuard profile is connected, the controller sees the mesh as down and cannot turn the mesh on until you switch back to mesh mode. If the controller asks to turn the mesh **off** and nothing happens, look for an **Approve fleet action?** notification on this phone.
+**The fleet controller cannot connect.** Turn on **Allow fleet controller (droidcommand-AI)**. Confirm droidcommand-AI is the signed package on the allowlist. The controller must use this install's node id (`mesh-` plus 32 hex characters). Bind package `com.victorious.mesh` (debug and release share it) and action `com.victorious.mesh.action.BRIDGE`. If you never granted VPN permission, turning the mesh on remotely is refused. If a WireGuard profile is connected, the controller sees the mesh as down and cannot turn the mesh on until you switch back to mesh mode. If the controller asks to turn the mesh **off** and nothing happens, look for an **Approve fleet action?** notification on this phone.
 
-**Debug and release on the same phone.** A debug build uses package `com.victorious.mesh.debug` so it can sit next to the release app. The controller must set the bind package to the one that is installed.
-
-**Why some code still says `com.tailscale.ipn`.** The install id is `com.victorious.mesh` (plus `.debug` on debug builds). The Gradle namespace that generates `R` / `BuildConfig` is also `com.victorious.mesh`. The Kotlin source package is still `com.tailscale.ipn` on purpose: a full rename would risk the gomobile `libtailscale` bindings and a large merge against upstream tailscale-android. That move is deferred.
+**Why some code still says `com.tailscale.ipn`.** The install id and Gradle namespace (`R` / `BuildConfig`) are `com.victorious.mesh`. The Kotlin source package is still `com.tailscale.ipn` on purpose: a full rename would risk the gomobile `libtailscale` bindings and a large merge against upstream tailscale-android. That move is deferred.
 
 **I turned the controller off but I still see a VPN.** The Settings switch only blocks *remote* control. Use the main-screen switch (or the Quick Settings tile) to stop the VPN yourself.
 
@@ -311,7 +309,7 @@ Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDG
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 
-**Debug vs release.** Debug builds from CI share a fixed debug signature and install as `com.victorious.mesh.debug`. Release builds use a separate key that is not stored in the project and install as `com.victorious.mesh`.
+**Debug vs release.** Debug and release both install as `com.victorious.mesh`. Debug builds from CI share a fixed debug signature. Release builds use a separate key that is not stored in the project.
 
 ## Privacy and data handling
 

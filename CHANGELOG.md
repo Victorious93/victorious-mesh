@@ -6,10 +6,7 @@
 - Gradle `namespace` is `com.victorious.mesh` (`R` / `BuildConfig`). Kotlin
   sources stay `com.tailscale.ipn` (gomobile `libtailscale` + upstream-merge
   deferral; documented in README and MANUAL troubleshooting).
-- Debug builds use `applicationIdSuffix ".debug"` so the debug package is
-  `com.victorious.mesh.debug`. `applicationId` remains `com.victorious.mesh`.
-  Fleet action `com.victorious.mesh.action.BRIDGE` is unchanged (not derived
-  from `${applicationId}`).
+  `applicationId` remains `com.victorious.mesh` for debug and release.
 - Versioning is inherited from upstream Tailscale (`mkversion` /
   `tailscale.version`) — an allowed fork exception, documented in README.
 

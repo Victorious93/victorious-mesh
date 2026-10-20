@@ -34,9 +34,7 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 **droidcommand-AI** (`ai.droidcommand.app`) drives it:
 
 - **Transport:** an Android Messenger bridge, intent action
-  `com.victorious.mesh.action.BRIDGE` (frozen; not `${applicationId}.action.BRIDGE`).
-  Bind the *installed* package: release `com.victorious.mesh`, debug
-  `com.victorious.mesh.debug`.
+  `com.victorious.mesh.action.BRIDGE` (package `com.victorious.mesh`).
 - **Protocol:** the shared fleet JSON envelope, `protocol_major` 1, `protocol_minor` 1
   (remote-control envelope plus backward-compatible `mesh.*` ops).
 - **Pairing:** by package name + signing-certificate SHA-256, checked on this side.
@@ -131,11 +129,10 @@ not keep a separate version scheme. The Play/install `applicationId` remains
 
 | What | Value | Notes |
 |---|---|---|
-| `applicationId` | `com.victorious.mesh` | Play / install id. **Never change this.** |
-| Debug install package | `com.victorious.mesh.debug` | `applicationIdSuffix = ".debug"` on the debug build type. Release stays `com.victorious.mesh`. |
+| `applicationId` | `com.victorious.mesh` | Play / install id for debug and release. **Never change this.** |
 | Gradle `namespace` | `com.victorious.mesh` | `R` and `BuildConfig` are generated here. |
 | Kotlin/Java source package | `com.tailscale.ipn.*` | **Deferred.** See below. |
-| Fleet bridge action | `com.victorious.mesh.action.BRIDGE` | Frozen string. Do not use `${applicationId}`. |
+| Fleet bridge action | `com.victorious.mesh.action.BRIDGE` | Frozen string. |
 
 ### Why the Kotlin package was not moved
 
@@ -150,13 +147,10 @@ A full `com.tailscale.ipn` → `com.victorious.mesh` source move is deferred:
 - Manifest components use fully qualified `com.tailscale.ipn.*` names so they
   stay valid after the Gradle namespace change. There is no `FileProvider` /
   `android:authorities` that needs `${applicationId}`.
-- `BuildConfig.APPLICATION_ID` already includes the debug suffix, so split
-  tunneling and similar checks follow the installed package automatically.
 
 Safe in this change: Gradle `namespace`, `R` / `BuildConfig` imports, FQCN
-manifest names, debug `applicationIdSuffix`, ProGuard keep for
-`com.victorious.mesh.R` / `BuildConfig`. The committed debug keystore is
-unchanged; no release keys are added.
+manifest names, ProGuard keep for `com.victorious.mesh.R` / `BuildConfig`.
+The committed debug keystore is unchanged; no release keys are added.
 
 ## Signing
 

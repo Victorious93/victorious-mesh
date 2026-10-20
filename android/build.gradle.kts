@@ -122,9 +122,6 @@ android {
     debug {
       manifestPlaceholders["leanbackRequired"] = isTV()
       signingConfig = signingConfigs.getByName("debug")
-      // Install id becomes com.victorious.mesh.debug so a debug APK can
-      // sit next to the release app. applicationId itself is never changed.
-      applicationIdSuffix = ".debug"
     }
 
     release {

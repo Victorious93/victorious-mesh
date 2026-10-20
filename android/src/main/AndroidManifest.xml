@@ -35,9 +35,8 @@
          would resolve against the namespace and miss the classes.
          There is no FileProvider / android:authorities in this app.
          The fleet action is frozen as com.victorious.mesh.action.BRIDGE
-         and must not use ${applicationId} — the debug suffix would change
-         the action and break the controller. Bind the *installed* package
-         (com.victorious.mesh or com.victorious.mesh.debug) plus that action. -->
+         (not ${applicationId}.action.BRIDGE). Bind package
+         com.victorious.mesh — debug and release share that applicationId. -->
     <application
         android:name="com.tailscale.ipn.App"
         android:allowBackup="false"
