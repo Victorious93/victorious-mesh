@@ -140,7 +140,7 @@ class FleetEnvelopeTest {
     assertTrue(r.ok)
     assertEquals(1, r.protocolMinor)
     val ops = r.result!!["operations"]!!.jsonArray
-    assertEquals(5, ops.size)
+    assertEquals(6, ops.size)
     val byName = ops.associate { it.jsonObject["name"]!!.jsonPrimitive.content to it.jsonObject }
     fun cap(name: String, kind: String, confirm: Boolean) {
       val o = byName.getValue(name)
@@ -151,6 +151,7 @@ class FleetEnvelopeTest {
     cap("mesh.capabilities.get", "read", false)
     cap("mesh.status", "read", false)
     cap("mesh.ip.get", "read", false)
+    cap("node.status.get", "read", false)
     cap("mesh.up", "action", false)
     cap("mesh.down", "destructive", true)
     assertEquals(1, r.result!!["protocol_minor"]!!.jsonPrimitive.content.toInt())

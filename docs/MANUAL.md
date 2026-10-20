@@ -230,13 +230,14 @@ The controller **droidcommand-AI** (`ai.droidcommand.app`) can:
 
 - Read what this node supports
 - Read connection status (running or stopped, control server URL, mesh IP addresses)
+- Read a short **status tray** snapshot (`node.status.get`): mesh, VPN, and whether this app is alive. That answer does not include keys or IP addresses.
 - Turn the mesh **on**
 - Turn the mesh **off**
 - Read this phone's mesh IPv4 and IPv6
 
 It cannot read keys, auth keys, or other secrets. It cannot change the Headscale URL or log you in. It cannot start or stop a WireGuard profile.
 
-**While WireGuard mode is on:** `mesh.status` reports the mesh as down (`connected: false`, no mesh IPs). `mesh.up` is refused until you switch back to mesh mode in the app. `mesh.down` does not tear down the WireGuard tunnel.
+**While WireGuard mode is on:** `mesh.status` reports the mesh as down (`connected: false`, no mesh IPs). `mesh.up` is refused until you switch back to mesh mode in the app. `mesh.down` does not tear down the WireGuard tunnel. The status-tray snapshot also shows the mesh as down and the VPN as up (the WireGuard tunnel).
 
 ### External control is off by default
 
@@ -281,7 +282,7 @@ The controller binds this app by package `com.victorious.mesh` plus the action `
 
 Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDGE.md).
 
-**[not device-verified]** The envelope, time checks, pairing errors, and the Approve/Deny notification have not been run on a real phone.
+**[not device-verified]** The envelope, time checks, pairing errors, the Approve/Deny notification, and the `node.status.get` snapshot on a real phone have not been run.
 
 ## Troubleshooting and FAQ
 
