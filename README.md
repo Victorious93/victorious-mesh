@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="victorious-mesh logo" width="200">
+</p>
+
 # Victorious Mesh
 
 Victorious Mesh is a secure mesh-networking / VPN app for Android
