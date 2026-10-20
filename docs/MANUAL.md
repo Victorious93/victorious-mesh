@@ -213,6 +213,24 @@ When this is on and you have started the mesh or WireGuard, the app treats that 
 
 **Limits.** Another app taking the VPN slot (`onRevoke`) cannot be held — the system gives that app the interface. Apps set to **Direct** in Per-app routing still bypass. The blackhole uses documentation addresses (`192.0.2.1` / `2001:db8::1`) and is replaced when the real tunnel comes back. IPv6 hold can fail on some devices. There is **no fleet operation** for this.
 
+### Auto-connect
+
+![Auto-connect](images/manual/auto-connect.png)
+
+*Screenshot pending.*
+
+**Settings → Auto-connect**
+
+**Off by default.** **[not device-verified]**
+
+When this is on, the last tunnel mode (mesh, or the last WireGuard profile) starts:
+
+1. When you open the app.
+2. After the phone finishes booting (after the first unlock).
+3. Immediately when you turn this switch on, if VPN permission is already granted.
+
+**Limits.** Android 12 and newer may block a start from boot. **Always-on VPN** in Android settings is more reliable for that. This does not start before the first unlock. It does not start if you have never granted VPN permission (`isAbleToStartVPN` is false). Turning the main switch off still disconnects; the next app open or reboot will start again while this setting is on. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -298,6 +316,7 @@ Victorious Mesh asks for the following. Android's VPN permission is separate fro
 | Change network state | Lets the VPN attach to the system network (declared for the VPN stack). |
 | Notifications | Alerts for connection health, sign-in expiry, Mesh Drop, and the persistent mesh-proxy notification while that listener is on. You can leave the VPN status notification off in system settings. |
 | Storage (Android 10 and older) | Saves incoming Mesh Drop files on older Android versions. |
+| Boot completed | After you turn on Auto-connect, the app may try to start the last tunnel when the phone finishes booting. Android 12+ can still refuse that start. |
 | Foreground service | Keeps the VPN running while the app is in the background. |
 | Query all packages | Builds the list of installed apps for split tunneling. |
 
@@ -427,6 +446,8 @@ under **Settings → WireGuard**.
 **Internet still bypasses my upstream proxy.** Advisory HTTP (Android 10+) is not forced. Turn on **Force all traffic** to send VPN TCP through the proxy. UDP still needs SOCKS5 UDP ASSOCIATE. DNS, IPv6, ICMP, Direct apps, and WireGuard mode are documented gaps. See **Settings → Proxy**.
 
 **The kill switch is on but I still have internet after a drop.** Turn the main switch off only when you want to leave. Direct apps skip the VPN. If another VPN app took the slot, this app cannot hold it. Use Android **Always-on VPN** and **Block connections without VPN** for a system lock. **[not device-verified]**
+
+**Auto-connect did not start after reboot.** Grant VPN permission once first. Android 12+ may block a start from boot — use **Always-on VPN**. The app does not start before the first unlock. **[not device-verified]**
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 

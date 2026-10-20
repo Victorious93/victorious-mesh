@@ -98,6 +98,9 @@ import com.tailscale.ipn.ui.view.TaildropDirectoryPickerPrompt
 import com.tailscale.ipn.ui.view.TailnetLockSetupView
 import com.tailscale.ipn.ui.view.UserSwitcherNav
 import com.tailscale.ipn.ui.view.UserSwitcherView
+import com.tailscale.ipn.autoconnect.AutoConnectController
+import com.tailscale.ipn.autoconnect.AutoConnectEvent
+import com.tailscale.ipn.ui.view.AutoConnectView
 import com.tailscale.ipn.ui.view.KillSwitchView
 import com.tailscale.ipn.ui.view.PerAppRoutingView
 import com.tailscale.ipn.ui.view.ProxyView
@@ -151,6 +154,7 @@ class MainActivity : ComponentActivity() {
 
     // grab app to make sure it initializes
     App.get()
+    AutoConnectController.maybeStart(this, AutoConnectEvent.APP_START)
     appViewModel = (application as App).getAppScopedViewModel()
     viewModel =
         ViewModelProvider(this, MainViewModelFactory(appViewModel)).get(MainViewModel::class.java)
@@ -349,6 +353,7 @@ class MainActivity : ComponentActivity() {
                       onNavigateToProxy = { navController.navigate("proxy") },
                       onNavigateToPerAppRouting = { navController.navigate("perAppRouting") },
                       onNavigateToKillSwitch = { navController.navigate("killSwitch") },
+                      onNavigateToAutoConnect = { navController.navigate("autoConnect") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -438,6 +443,7 @@ class MainActivity : ComponentActivity() {
               composable("proxy") { ProxyView(backTo("settings")) }
               composable("perAppRouting") { PerAppRoutingView(backTo("settings")) }
               composable("killSwitch") { KillSwitchView(backTo("settings")) }
+              composable("autoConnect") { AutoConnectView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(

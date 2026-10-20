@@ -10,6 +10,7 @@
         android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission
@@ -119,6 +120,15 @@
         <receiver
             android:name="com.tailscale.ipn.InlineShareActionReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name="com.tailscale.ipn.autoconnect.AutoConnectReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name="com.tailscale.ipn.mdm.MDMSettingsChangedReceiver"
