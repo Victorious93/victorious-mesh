@@ -54,7 +54,7 @@ class ProxyStoreTest {
                 host = "10.1.2.3",
                 port = 3128,
                 username = "u",
-                password = "p",
+                password = "s3cret",
             )
         )
     val again = ProxyStore(backing).upstream()
@@ -62,8 +62,8 @@ class ProxyStoreTest {
     assertEquals("10.1.2.3", again.host)
     assertEquals(3128, again.port)
     assertEquals("u", again.username)
-    assertEquals("p", again.password)
-    assertFalse("p" in again.toString())
+    assertEquals("s3cret", again.password)
+    assertFalse("s3cret" in again.toString())
 
     backing.put("proxy.up.kind", "not-a-kind")
     assertEquals(UpstreamKind.NONE, ProxyStore(backing).upstream().kind)
