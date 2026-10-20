@@ -33,13 +33,27 @@ taken from `Message.sendingUid`. **Never** from any envelope field, including
 The calling app must be one of these, signed with the matching certificate
 (SHA-256):
 
-| Package | Allowed signing certs (SHA-256) |
-|---|---|
-| `ai.droidcommand.app` | debug `88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D` and release `9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D` |
-| `ai.droidcommand.app.debug` | same two certs |
+| Package | Scope | Allowed signing certs (SHA-256) |
+|---|---|---|
+| `ai.droidcommand.app` | full | debug `88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D` and release `9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D` |
+| `ai.droidcommand.app.debug` | full | same two certs |
+| `com.victorious.browser` | read-only: `mesh.status` and `mesh.ip` / `mesh.ip.get` | debug `2D:5D:9E:8B:53:8E:78:51:3D:B5:41:F4:DF:FD:67:BE:27:FF:EC:3F:37:EB:1A:D4:8D:77:83:AE:59:27:C3:E1` (release cert TBD) |
 
-The release cert is the shared fleet release key that droidcommand-AI signs with.
-Victorious Mesh itself is signed with its own, separate release key.
+The droidcommand-AI release cert is the shared fleet release key. Victorious Mesh
+itself is signed with its own, separate release key.
+
+**Victorious Browser** (Fleet Orchestrator ratified 2026-10-20) is a read-only
+consumer. It may call only legacy `mesh.status` and `mesh.ip` / `mesh.ip.get`.
+Every other op — including `node.status.get`, `config.*`, `mesh.up` /
+`mesh.down`, `mesh.capabilities.get`, and every remote envelope `op`
+(`capabilities.get`, `remote.command`, `macro.step`, `macro.run`) — is
+`unauthorized` / `unauthorized_caller`. Envelope TTL, nonce replay, and
+pairing checks are unchanged for full-scope callers.
+
+`mesh.ip` addresses are returned to the authorized caller but **must never be
+logged** and **must never appear in config backups**. `config.export` /
+`config.import` refuse a payload that contains a mesh address or the keys
+`ipv4` / `ipv6` / `ips` (`FleetRedaction`).
 
 ## How it talks
 
@@ -84,7 +98,7 @@ v1.1 envelope fields (`node.status.get`, `config.export`, `config.import`).
 | `mesh.status` | Current state | `backend_state` (e.g. `Running`, `Stopped`, `NeedsLogin`), `connected`, `control_url`, `ips`. While a WireGuard profile is connected this reports the mesh down (`connected: false`, empty `ips`). |
 | `mesh.up` | Turns the mesh on | `requested: "up"` (the start is asynchronous; poll `mesh.status`). Refused if WireGuard mode is active. |
 | `mesh.down` | Turns the mesh off | `requested: "down"`. No-op if WireGuard mode is already active (the mesh is already down). Legacy `mesh.down` still runs immediately (backward compatible). The same action via `remote.command` is gated (see below). |
-| `mesh.ip.get` | This phone's mesh addresses | `ipv4`, `ipv6` (null if not connected) |
+| `mesh.ip.get` | This phone's mesh addresses (`mesh.ip` is accepted as an alias) | `ipv4`, `ipv6` (null if not connected). Never log these values. |
 | `node.status.get` | Status-tray snapshot for this node (canonical standalone read op) | `NodeStatusSnapshot` (see below). Envelope fields live in `parameters`. |
 | `config.export` | This app's settings snapshot (canonical standalone action) | One `UnifiedBackupEntry` for `com.victorious.mesh`. Envelope fields live in `parameters`. |
 | `config.import` | Restore settings from a bundle (canonical standalone action) | Dry-run returns the planned diff. A real import needs on-phone Approve/Deny and never enables external control. |

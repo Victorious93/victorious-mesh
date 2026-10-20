@@ -44,6 +44,8 @@ object FleetProtocol {
   const val OP_UP = "mesh.up"
   const val OP_DOWN = "mesh.down"
   const val OP_IP_GET = "mesh.ip.get"
+  /** Informal alias for [OP_IP_GET]; accepted from scoped readers. */
+  const val OP_IP = "mesh.ip"
   const val OP_NODE_STATUS = "node.status.get"
   const val OP_CONFIG_EXPORT = "config.export"
   const val OP_CONFIG_IMPORT = "config.import"
@@ -58,6 +60,9 @@ object FleetProtocol {
           OP_CONFIG_EXPORT,
           OP_CONFIG_IMPORT,
       )
+
+  fun normalizeOp(operation: String): String =
+      if (operation == OP_IP) OP_IP_GET else operation
 
   const val OP_REMOTE_CAPABILITIES = "capabilities.get"
   const val OP_REMOTE_COMMAND = "remote.command"
@@ -373,8 +378,40 @@ class NonceCache(
   }
 }
 
-/** Signing-cert allowlist for controller apps. */
+/** Per-caller operation scope. Package + cert still decide identity; this limits ops. */
+enum class CallerScope {
+  NONE,
+  /** Victorious Browser: legacy `mesh.status` and `mesh.ip` / `mesh.ip.get` only. */
+  READ_STATUS_IP,
+  /** droidcommand-AI: full allowlisted surface. */
+  FULL,
+  ;
+
+  fun allowsLegacy(operation: String): Boolean =
+      when (this) {
+        NONE -> false
+        FULL -> true
+        READ_STATUS_IP -> {
+          val op = FleetProtocol.normalizeOp(operation)
+          op == FleetProtocol.OP_STATUS || op == FleetProtocol.OP_IP_GET
+        }
+      }
+
+  /** Remote envelope (`op`) is full-controller only. */
+  fun allowsEnvelope(): Boolean =
+      when (this) {
+        NONE -> false
+        FULL -> true
+        READ_STATUS_IP -> false
+      }
+}
+
+/** Signing-cert allowlist for controller apps, with per-caller scope. */
 object CallerAllowlist {
+  const val PKG_DCA = "ai.droidcommand.app"
+  const val PKG_DCA_DEBUG = "ai.droidcommand.app.debug"
+  const val PKG_BROWSER = "com.victorious.browser"
+
   private const val DCA_DEBUG_CERT =
       "88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D"
 
@@ -383,12 +420,18 @@ object CallerAllowlist {
   private const val DCA_RELEASE_CERT =
       "9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D"
 
+  // Victorious Browser debug cert (Fleet Orchestrator ratified 2026-10-20). Release cert TBD.
+  const val BROWSER_DEBUG_CERT =
+      "2D:5D:9E:8B:53:8E:78:51:3D:B5:41:F4:DF:FD:67:BE:27:FF:EC:3F:37:EB:1A:D4:8D:77:83:AE:59:27:C3:E1"
+
   private val DCA_CERTS = setOf(normalize(DCA_DEBUG_CERT), normalize(DCA_RELEASE_CERT))
+  private val BROWSER_CERTS = setOf(normalize(BROWSER_DEBUG_CERT))
 
   val ENTRIES: Map<String, Set<String>> =
       mapOf(
-          "ai.droidcommand.app" to DCA_CERTS,
-          "ai.droidcommand.app.debug" to DCA_CERTS,
+          PKG_DCA to DCA_CERTS,
+          PKG_DCA_DEBUG to DCA_CERTS,
+          PKG_BROWSER to BROWSER_CERTS,
       )
 
   fun normalize(fp: String) = fp.replace(":", "").replace(" ", "").lowercase()
@@ -398,15 +441,58 @@ object CallerAllowlist {
         "%02x".format(it)
       }
 
+  fun scopeForPackage(pkg: String): CallerScope =
+      when (pkg) {
+        PKG_BROWSER -> CallerScope.READ_STATUS_IP
+        PKG_DCA, PKG_DCA_DEBUG -> CallerScope.FULL
+        else -> CallerScope.NONE
+      }
+
+  /**
+   * Highest scope among matching (package, cert) pairs. A UID that also has
+   * droidcommand-AI wins FULL over the browser reader scope.
+   */
+  fun scopeFor(
+      candidates: Map<String, List<String>>,
+      entries: Map<String, Set<String>> = ENTRIES,
+  ): CallerScope {
+    var best = CallerScope.NONE
+    for ((pkg, certs) in candidates) {
+      val allowed = entries[pkg] ?: continue
+      if (certs.none { normalize(it) in allowed }) continue
+      val next = scopeForPackage(pkg)
+      if (next.ordinal > best.ordinal) best = next
+    }
+    return best
+  }
+
   /** True if any (package, cert sha256) pair is allowlisted. */
   fun isAllowed(
       candidates: Map<String, List<String>>,
       entries: Map<String, Set<String>> = ENTRIES,
-  ): Boolean =
-      candidates.any { (pkg, certs) ->
-        val allowed = entries[pkg] ?: return@any false
-        certs.any { normalize(it) in allowed }
-      }
+  ): Boolean = scopeFor(candidates, entries) != CallerScope.NONE
+}
+
+/**
+ * Mesh IPs must never be written to logs or config backups. Responses to
+ * `mesh.ip.get` / `mesh.status` may still return them to an authorized caller.
+ */
+object FleetRedaction {
+  val BACKUP_FORBIDDEN_KEYS = setOf("ipv4", "ipv6", "ips", "mesh.ip", "mesh.ip.get")
+
+  private val V4 = Regex("""\b100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}\b""")
+  private val V6 = Regex("""(?i)fd7a:115c:a1e0:[0-9a-f:]*""")
+
+  fun containsMeshAddress(text: String): Boolean = V4.containsMatchIn(text) || V6.containsMatchIn(text)
+
+  fun redact(text: String): String = V6.replace(V4.replace(text, "[mesh-ip]"), "[mesh-ip]")
+
+  fun jsonContainsBackupForbiddenKeys(text: String): Boolean {
+    val lower = text.lowercase()
+    return BACKUP_FORBIDDEN_KEYS.any { key ->
+      lower.contains("\"$key\"") || lower.contains("\"$key\":")
+    }
+  }
 }
 
 /**
@@ -417,6 +503,7 @@ object CallerAllowlist {
  *
  * Legacy mesh.* BridgeRequest check order (backward compatible):
  * 1. caller allowlist -> unauthorized_caller
+ * 1b. per-caller scope (browser: mesh.status / mesh.ip only) -> unauthorized_caller
  * 2. JSON parse -> malformed_request
  * 3. protocol_major -> protocol_mismatch
  * 4. target_node_id -> node_mismatch
@@ -429,6 +516,7 @@ object CallerAllowlist {
  *
  * Remote envelope v1.1 check order:
  * 1. caller allowlist -> unauthorized
+ * 1b. per-caller scope (browser cannot use envelope ops) -> unauthorized
  * 2. JSON parse / required fields -> invalid_parameters
  * 3. targetNodeRef: blank/malformed -> invalid_parameters; unknown -> not_found;
  *    known but not paired with sender -> not_paired
@@ -466,18 +554,19 @@ class FleetDispatcher(
       callerAllowed: Boolean,
       controlEnabled: Boolean,
       sourceNodeRef: String = "",
+      callerScope: CallerScope = CallerScope.FULL,
   ): BridgeResponse {
     val src = sourceNodeRef.ifBlank { "unknown-caller" }
-    if (!callerAllowed) {
+    if (!callerAllowed || callerScope == CallerScope.NONE) {
       val cat =
           if (FleetProtocol.looksLikeRemoteEnvelope(raw)) ErrorCategory.UNAUTHORIZED
           else ErrorCategory.UNAUTHORIZED_CALLER
       return err(null, cat, "caller is not an allowlisted controller", withNode = false)
     }
     if (FleetProtocol.looksLikeRemoteEnvelope(raw)) {
-      return handleEnvelope(raw, controlEnabled, src)
+      return handleEnvelope(raw, controlEnabled, src, callerScope)
     }
-    return handleLegacy(raw, controlEnabled, src)
+    return handleLegacy(raw, controlEnabled, src, callerScope)
   }
 
   fun confirmAndExecute(pendingId: String): BridgeResponse {
@@ -506,6 +595,7 @@ class FleetDispatcher(
       raw: String?,
       controlEnabled: Boolean,
       sourceNodeRef: String,
+      callerScope: CallerScope,
   ): BridgeResponse {
     val req =
         try {
@@ -521,6 +611,12 @@ class FleetDispatcher(
         )
     if (req.targetNodeId != nodeId)
         return err(req.requestId, ErrorCategory.NODE_MISMATCH, "target_node_id does not match this node")
+    if (!callerScope.allowsLegacy(req.operation))
+        return err(
+            req.requestId,
+            ErrorCategory.UNAUTHORIZED_CALLER,
+            "caller is not authorized for this operation",
+        )
     if (req.operation == FleetProtocol.OP_NODE_STATUS)
         return handleNodeStatus(req, controlEnabled, sourceNodeRef)
     if (req.operation == FleetProtocol.OP_CONFIG_EXPORT)
@@ -534,12 +630,13 @@ class FleetDispatcher(
             "external control is turned off in Victorious Mesh settings",
         )
     return try {
-      if (req.operation !in FleetProtocol.OPERATIONS)
+      val op = FleetProtocol.normalizeOp(req.operation)
+      if (op !in FleetProtocol.OPERATIONS)
           return err(req.requestId, ErrorCategory.UNSUPPORTED_OPERATION, "unsupported operation")
-      if (req.parameters.isNotEmpty() && req.operation != FleetProtocol.OP_NODE_STATUS)
+      if (req.parameters.isNotEmpty() && op != FleetProtocol.OP_NODE_STATUS)
           throw InvalidParametersException("operation ${req.operation} takes no parameters")
       if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
-      ok(req.requestId, runMeshAction(req.operation, req.parameters))
+      ok(req.requestId, runMeshAction(op, req.parameters))
     } catch (e: InvalidParametersException) {
       err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
     } catch (e: ActionNotFound) {
@@ -671,6 +768,7 @@ class FleetDispatcher(
       raw: String?,
       controlEnabled: Boolean,
       sourceNodeRef: String,
+      callerScope: CallerScope,
   ): BridgeResponse {
     val env =
         try {
@@ -678,6 +776,12 @@ class FleetDispatcher(
         } catch (_: Exception) {
           return err(null, ErrorCategory.INVALID_PARAMETERS, "request is not a valid remote envelope")
         }
+    if (!callerScope.allowsEnvelope())
+        return err(
+            env.requestId,
+            ErrorCategory.UNAUTHORIZED,
+            "caller is not authorized for this operation",
+        )
     if (env.protocolMajor != FleetProtocol.PROTOCOL_MAJOR)
         return err(
             env.requestId,

@@ -195,6 +195,53 @@ class FleetConfigBackupTest {
   }
 
   @Test
+  fun exportRefusesMeshAddresses() {
+    val dirty = sampleLive().copy(controlUrl = "https://100.64.0.1")
+    assertCat(
+        "invalid_parameters",
+        Harness(dirty).call(canonical(FleetProtocol.OP_CONFIG_EXPORT)),
+    )
+  }
+
+  @Test
+  fun importRefusesMeshAddresses() {
+    val raw =
+        """{"version":1,"createdAtMs":$now0,"sourceNodeRef":"controller","wrapping":"none",
+          |"entries":[{"packageName":"$pkg","schemaVersion":1,
+          |"clearPayload":"{\"controlUrl\":\"https://100.64.0.1\"}"}]}"""
+            .trimMargin()
+            .replace("\n", "")
+    val r =
+        Harness()
+            .call(
+                canonical(
+                    FleetProtocol.OP_CONFIG_IMPORT,
+                    args = """{"bundle":$raw,"dryRun":true}""",
+                )
+            )
+    assertCat("invalid_parameters", r)
+  }
+
+  @Test
+  fun importRefusesForbiddenIpKeys() {
+    val raw =
+        """{"version":1,"createdAtMs":$now0,"sourceNodeRef":"controller","wrapping":"none",
+          |"entries":[{"packageName":"$pkg","schemaVersion":1,
+          |"clearPayload":"{\"controlUrl\":\"https://hs.example\",\"ipv4\":\"none\",\"ips\":[]}"}]}"""
+            .trimMargin()
+            .replace("\n", "")
+    val r =
+        Harness()
+            .call(
+                canonical(
+                    FleetProtocol.OP_CONFIG_IMPORT,
+                    args = """{"bundle":$raw,"dryRun":true}""",
+                )
+            )
+    assertCat("invalid_parameters", r)
+  }
+
+  @Test
   fun importRefusesSecretNames() {
     val raw =
         """{"version":1,"createdAtMs":$now0,"sourceNodeRef":"controller","wrapping":"none",

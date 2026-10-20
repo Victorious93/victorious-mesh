@@ -39,9 +39,12 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
   (remote-control envelope plus backward-compatible `mesh.*` ops).
 - **Pairing:** by package name + signing-certificate SHA-256, checked on this side.
   Mesh does **not** share a signing key with the controller.
-- **Allowlist:** `ai.droidcommand.app` and `ai.droidcommand.app.debug`, each pinned to
-  two certs: the droidcommand-AI debug cert (`88:00:51:A6:…:A0:C8:4D`) and the shared
-  fleet release cert the controller signs with (`9E:A7:B3:14:…:F7:2D:8D`). Full values in
+- **Allowlist:** `ai.droidcommand.app` and `ai.droidcommand.app.debug` (full
+  access), each pinned to two certs: the droidcommand-AI debug cert
+  (`88:00:51:A6:…:A0:C8:4D`) and the shared fleet release cert
+  (`9E:A7:B3:14:…:F7:2D:8D`). **Victorious Browser** (`com.victorious.browser`)
+  is a read-only consumer: `mesh.status` and `mesh.ip` / `mesh.ip.get` only
+  (debug cert pinned; release TBD). Full values in
   [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md). Mesh's own signing keys are separate.
 - Each install has a permanent node id: `mesh-` + 32 lowercase hex characters.
 

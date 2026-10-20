@@ -194,16 +194,17 @@ class FleetBridgeService : Service() {
       val uid = msg.sendingUid
       val reply = msg.replyTo ?: return
       val raw = msg.data?.getString(FleetProtocol.KEY_REQUEST)
-      val allowed = isCallerAllowed(uid)
+      val scope = callerScope(uid)
       val source = callerIdentity(uid)
       val resp =
           try {
             FleetRuntime.dispatcher(this@FleetBridgeService)
                 .handle(
                     raw,
-                    callerAllowed = allowed,
+                    callerAllowed = scope != CallerScope.NONE,
                     controlEnabled = FleetSettings.isExternalControlEnabled(this@FleetBridgeService),
                     sourceNodeRef = source,
+                    callerScope = scope,
                 )
           } catch (e: Exception) {
             BridgeResponse(ok = false, error = BridgeError(ErrorCategory.INTERNAL, "internal error"))
@@ -219,7 +220,7 @@ class FleetBridgeService : Service() {
       try {
         reply.send(out)
       } catch (e: Exception) {
-        TSLog.w(TAG, "fleet bridge reply failed: ${e.javaClass.simpleName}")
+        TSLog.w(TAG, FleetRedaction.redact("fleet bridge reply failed: ${e.javaClass.simpleName}"))
       }
     }
   }
@@ -230,12 +231,12 @@ class FleetBridgeService : Service() {
     return pkgs.sorted().joinToString(",")
   }
 
-  private fun isCallerAllowed(uid: Int): Boolean {
-    if (uid < 0) return false
+  private fun callerScope(uid: Int): CallerScope {
+    if (uid < 0) return CallerScope.NONE
     val pm = packageManager
-    val pkgs = pm.getPackagesForUid(uid) ?: return false
+    val pkgs = pm.getPackagesForUid(uid) ?: return CallerScope.NONE
     val candidates = pkgs.associateWith { signingCertSha256s(pm, it) }
-    return CallerAllowlist.isAllowed(candidates)
+    return CallerAllowlist.scopeFor(candidates)
   }
 
   @Suppress("DEPRECATION")
