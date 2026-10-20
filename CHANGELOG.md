@@ -15,6 +15,11 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Tiles & widget (Settings → Tiles & widget).** Off by default.
+  Extra Quick Settings tiles (kill switch, mesh-proxy share, status)
+  and a home-screen status widget. The original VPN toggle tile is
+  unchanged. Components stay disabled until the switch is on. No new
+  fleet ops. **[not device-verified]**
 - **Forced-proxy DNS and IPv6 (Settings → Proxy).** When Force all
   traffic is on, public DNS goes through the proxy (SOCKS5 UDP
   ASSOCIATE, else DNS over TCP). Mesh / MagicDNS stays on the mesh.

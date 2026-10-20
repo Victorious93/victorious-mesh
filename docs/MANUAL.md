@@ -269,6 +269,25 @@ Expected pairing app: `com.victorious.gps`. Debug cert SHA-256 `38:AE:B4:F2:B9:A
 
 **Not on the fleet allowlist.** VictorGPS cannot call the fleet bridge. There is **no fleet operation** for this.
 
+### Tiles & widget
+
+![Tiles and widget](images/manual/tiles-widget.png)
+
+*Screenshot pending.*
+
+**Settings → Tiles & widget**
+
+**Off by default.** **[not device-verified]**
+
+The original **Victorious Mesh** Quick Settings tile still toggles the VPN. This switch only offers extra surfaces:
+
+1. **Kill switch** tile — turns the kill switch setting on or off. It does not start the VPN.
+2. **Mesh proxy** tile — starts or stops the mesh-bound share listener. If the mesh is not ready, it opens the app.
+3. **Mesh status** tile — shows connected / not connected and this phone's mesh IPv4. Tap opens the app.
+4. **Home-screen widget** — same status line, plus a tap that toggles the VPN (opens the app if VPN permission is missing).
+
+After you turn this on, add the tiles from the Quick Settings editor and the widget from the home-screen widget picker. Turning the switch off hides those components again. The original connect tile is unchanged. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -320,7 +339,7 @@ On Android 12 and older, the app may also ask for storage access so Mesh Drop ca
 
 ### Quick Settings tile
 
-Add the **Victorious Mesh** tile in Android Quick Settings to toggle the VPN without opening the app. You still need VPN permission from the first run.
+Add the **Victorious Mesh** tile in Android Quick Settings to toggle the VPN without opening the app. You still need VPN permission from the first run. Extra tiles and a home-screen widget stay off until you turn them on under **Settings → Tiles & widget**.
 
 ### About
 
@@ -486,6 +505,8 @@ under **Settings → WireGuard**.
 **The kill switch is on but I still have internet after a drop.** Turn the main switch off only when you want to leave. Direct apps skip the VPN. If another VPN app took the slot, this app cannot hold it. Use Android **Always-on VPN** and **Block connections without VPN** for a system lock. **[not device-verified]**
 
 **Auto-connect did not start after reboot.** Grant VPN permission once first. Android 12+ may block a start from boot — use **Always-on VPN**. The app does not start before the first unlock. **[not device-verified]**
+
+**I cannot find the extra tiles or the widget.** Turn on **Settings → Tiles & widget**, then add them from the Quick Settings editor or the home-screen widget picker. The original Victorious Mesh tile is always available. **[not device-verified]**
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 

@@ -9,6 +9,7 @@ import com.tailscale.ipn.App
 import com.tailscale.ipn.killswitch.KillSwitchConfig
 import com.tailscale.ipn.killswitch.KillSwitchController
 import com.tailscale.ipn.killswitch.KillSwitchEvent
+import com.tailscale.ipn.tiles.ExtraTilesController
 import com.tailscale.ipn.ui.util.set
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,7 @@ class KillSwitchViewModel(app: Application) : AndroidViewModel(app) {
     val vpnRunning = App.get().getAppScopedViewModel().vpnActive.value
     val event = if (enabled) KillSwitchEvent.TOGGLE_ON else KillSwitchEvent.TOGGLE_OFF
     KillSwitchController.apply(event, vpnRunning)
+    ExtraTilesController.refreshSurfaces(getApplication())
     config.set(store.config())
   }
 }

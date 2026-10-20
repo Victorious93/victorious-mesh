@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.tailscale.ipn.App
 import com.tailscale.ipn.MainActivity
+import com.tailscale.ipn.tiles.ExtraTilesController
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
 import com.tailscale.ipn.wireguard.EncryptedPrefsSecretStore
@@ -74,6 +75,7 @@ object MeshProxyController {
       Libtailscale.startMeshProxy(ip, cfg.port, cfg.username, cfg.password)
       lastStartKey = key
       MeshProxyNotifier.show(ctx, ip, cfg.port)
+      ExtraTilesController.refreshSurfaces(ctx)
     } catch (e: Exception) {
       TSLog.e(TAG, "start failed: ${e.message}")
       stop(ctx)
@@ -88,6 +90,7 @@ object MeshProxyController {
       TSLog.w(TAG, "stop: ${e.javaClass.simpleName}")
     }
     MeshProxyNotifier.cancel(ctx)
+    ExtraTilesController.refreshSurfaces(ctx)
   }
 
   fun running(): Boolean =

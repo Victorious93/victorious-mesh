@@ -66,6 +66,16 @@ class ManualAssetTest {
   }
 
   @Test
+  fun tilesAndWidgetAreDocumented() {
+    val stream = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)
+    assertNotNull(stream)
+    val text = stream!!.bufferedReader().use { it.readText() }
+    assertTrue("manual should have Tiles & widget", text.contains("### Tiles & widget"))
+    assertTrue("manual should say extra tiles are off by default", text.contains("Off by default"))
+    assertTrue("manual should mention the home-screen widget", text.contains("Home-screen widget"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(
