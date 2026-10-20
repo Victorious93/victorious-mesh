@@ -263,9 +263,20 @@ Remote control is gated on this phone:
 
 - **Allowing control** is an on-phone Settings switch. Nothing remote can turn that switch on for you.
 - **Turning the mesh on** from the controller is refused until you have opened this app and accepted the Android VPN permission dialog. That system dialog is the on-phone confirmation for handing the VPN slot to Victorious Mesh. It is also refused while a WireGuard profile is connected — you must tap **Switch back to mesh mode** (or disconnect WireGuard) on the phone first.
-- **Turning the mesh off** from the controller, once the switch is on and the caller is allowlisted, happens without a second pop-up. If WireGuard is already running, that request does not stop the WireGuard tunnel. If you do not want the controller to stop the mesh, turn **Allow fleet controller** off.
+- **Turning the mesh off** from the newer remote-control commands needs a tap on this phone. You get a notification asking you to **Approve** or **Deny**. Until you approve it, the mesh stays up. A leftover older command can still turn the mesh off without that notification; if you do not want that, leave **Allow fleet controller** off. If WireGuard is already running, turning the mesh off does not stop the WireGuard tunnel.
 
-There is no extra in-app “Type yes to confirm” step beyond VPN permission and the Settings switch.
+Nothing in the controller's request — including any “trigger” or “already approved” flag — can skip that tap. The phone never auto-approves a remote turn-off.
+
+### Remote-control envelope (v1.1)
+
+The controller can send a newer kind of request on the same bridge. In plain language:
+
+- It can ask what this phone allows (`capabilities.get`) even when the Settings switch is off. That answer is a list only; it does not turn the mesh on or off.
+- It can run one mesh action (`remote.command`) or a short list of steps (`macro.step` / `macro.run`). A “dry run” checks the list without doing anything.
+- Each request is time-limited and can be used only once, so an old or copied command is rejected.
+- The phone decides who is allowed by looking at which app sent the message and how that app is signed. Fields inside the message never grant access.
+
+Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDGE.md).
 
 ## Troubleshooting and FAQ
 
@@ -281,7 +292,7 @@ There is no extra in-app “Type yes to confirm” step beyond VPN permission an
 
 **Mesh Drop will not save files.** Pick a Mesh Drop directory under **Settings → Permissions**. On older Android, allow storage.
 
-**The fleet controller cannot connect.** Turn on **Allow fleet controller (droidcommand-AI)**. Confirm droidcommand-AI is the signed package on the allowlist. The controller must use this install's node id (`mesh-` plus 32 hex characters). If you never granted VPN permission, turning the mesh on remotely is refused. If a WireGuard profile is connected, the controller sees the mesh as down and cannot turn the mesh on until you switch back to mesh mode.
+**The fleet controller cannot connect.** Turn on **Allow fleet controller (droidcommand-AI)**. Confirm droidcommand-AI is the signed package on the allowlist. The controller must use this install's node id (`mesh-` plus 32 hex characters). If you never granted VPN permission, turning the mesh on remotely is refused. If a WireGuard profile is connected, the controller sees the mesh as down and cannot turn the mesh on until you switch back to mesh mode. If the controller asks to turn the mesh **off** and nothing happens, look for an **Approve fleet action?** notification on this phone.
 
 **I turned the controller off but I still see a VPN.** The Settings switch only blocks *remote* control. Use the main-screen switch (or the Quick Settings tile) to stop the VPN yourself.
 
