@@ -283,9 +283,9 @@ WireGuard tunnel down. `node.status.get` reports `mesh` as `down` and
 
 ### Proxy
 
-No fleet operations for the on-phone mesh proxy or the outbound/upstream
-proxy. Settings → Proxy is local only. The Fleet Orchestrator must ratify
-any later remote control.
+No fleet operations for the on-phone mesh proxy, the advisory upstream
+proxy, or the forced TUN-to-proxy path. Settings → Proxy is local only.
+The Fleet Orchestrator must ratify any later remote control.
 
 ### Per-app routing
 

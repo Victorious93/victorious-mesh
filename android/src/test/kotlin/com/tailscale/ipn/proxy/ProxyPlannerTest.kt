@@ -79,6 +79,17 @@ class ProxyPlannerTest {
   }
 
   @Test
+  fun planOutboundForcedExcludesLiteralAndMarksForced() {
+    val socks = ProxyPlanner.planOutbound(UpstreamKind.SOCKS5, "1.2.3.4", 1080, 28, forced = true)
+    assertTrue(socks.forced)
+    assertEquals("1.2.3.4", socks.excludeHost)
+    assertFalse(socks.applyHttpProxy)
+    val http = ProxyPlanner.planOutbound(UpstreamKind.HTTP, "1.2.3.4", 8080, 33, forced = true)
+    assertTrue(http.forced)
+    assertTrue(http.applyHttpProxy)
+  }
+
+  @Test
   fun planOutboundDoesNotExcludeHostnamesOrMeshIps() {
     val host = ProxyPlanner.planOutbound(UpstreamKind.HTTP, "proxy.example.com", 8080, 33)
     assertTrue(host.applyHttpProxy)

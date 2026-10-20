@@ -114,7 +114,9 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
           UpstreamKind.entries.forEach { kind ->
             FilterChip(
                 selected = upstream.kind == kind,
-                onClick = { model.setUpstream(kind, upHost, upPort, upUser, upPass) },
+                onClick = {
+                  model.setUpstream(kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed)
+                },
                 label = { Text(kindLabel(kind)) },
             )
           }
@@ -148,7 +150,23 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
         )
-        TextButton(onClick = { model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass) }) {
+        Setting.Switch(
+            titleRes = R.string.proxy_forced_enable,
+            subtitle = stringResource(R.string.proxy_forced_body),
+            isOn = upstream.forced,
+            onToggle = { on ->
+              model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, forced = on, failClosed = upstream.failClosed)
+            },
+        )
+        Setting.Switch(
+            titleRes = R.string.proxy_fail_closed,
+            subtitle = stringResource(R.string.proxy_fail_closed_body),
+            isOn = upstream.failClosed,
+            onToggle = { on ->
+              model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, forced = upstream.forced, failClosed = on)
+            },
+        )
+        TextButton(onClick = { model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed) }) {
           Text(stringResource(R.string.proxy_save_upstream))
         }
       }

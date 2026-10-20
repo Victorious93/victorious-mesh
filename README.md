@@ -121,12 +121,13 @@ built-in userspace listeners. The bind address is this node's mesh IPv4 only
 EncryptedSharedPreferences. A persistent notification stays up while it
 runs. WireGuard mode turns it off.
 
-**Upstream:** HTTP on Android 10+ calls `VpnService.Builder.setHttpProxy`
-(advisory; apps may ignore it; no platform credential field). Literal
-non-mesh proxy IPs are excluded from the VPN on Android 13+ to avoid a
-routing loop. SOCKS5 settings are saved only — there is no all-app SOCKS
-API, and a TUN-to-SOCKS rewriter is out of scope. **This cannot promise
-no leak** when an upstream proxy is enabled.
+**Upstream:** HTTP on Android 10+ can still use advisory `setHttpProxy`
+(apps may ignore it). **Force all traffic** (off by default) is a
+TUN-to-SOCKS5/HTTP-CONNECT path in libtailscale: TCP goes through the
+proxy with credentials; UDP uses SOCKS5 UDP ASSOCIATE or is blocked;
+fail-closed blocks flows if the proxy drops. Literal non-mesh proxy IPs
+are excluded from the VPN to avoid a loop. DNS and IPv6 remain limited
+(see MANUAL). **[not device-verified]**
 
 **Fleet bridge:** no new operations. The Orchestrator must ratify any later
 remote control.

@@ -28,6 +28,8 @@ class ProxyStoreTest {
     assertEquals(DEFAULT_MESH_PORT, s.mesh().port)
     assertEquals(UpstreamKind.NONE, s.upstream().kind)
     assertEquals(DEFAULT_UPSTREAM_PORT, s.upstream().port)
+    assertFalse(s.upstream().forced)
+    assertFalse(s.upstream().failClosed)
   }
 
   @Test
@@ -55,6 +57,8 @@ class ProxyStoreTest {
                 port = 3128,
                 username = "u",
                 password = "s3cret",
+                forced = true,
+                failClosed = true,
             )
         )
     val again = ProxyStore(backing).upstream()
@@ -63,6 +67,8 @@ class ProxyStoreTest {
     assertEquals(3128, again.port)
     assertEquals("u", again.username)
     assertEquals("s3cret", again.password)
+    assertTrue(again.forced)
+    assertTrue(again.failClosed)
     assertFalse("s3cret" in again.toString())
 
     backing.put("proxy.up.kind", "not-a-kind")

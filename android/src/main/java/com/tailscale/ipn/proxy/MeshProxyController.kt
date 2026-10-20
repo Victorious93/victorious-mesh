@@ -96,6 +96,38 @@ object MeshProxyController {
       } catch (_: Exception) {
         false
       }
+
+  fun syncForced(ctx: Context) {
+    val cfg = store(ctx).upstream()
+    if (WireGuardManager.isWireGuardActive() || !cfg.forced || cfg.kind == UpstreamKind.NONE || cfg.host.isBlank()) {
+      clearForced()
+      return
+    }
+    if (!ProxyPlanner.validPort(cfg.port) || !ProxyPlanner.authComplete(cfg.username, cfg.password)) {
+      TSLog.w(TAG, "forced upstream rejected: port or auth")
+      clearForced()
+      return
+    }
+    val kind =
+        when (cfg.kind) {
+          UpstreamKind.HTTP -> "http"
+          UpstreamKind.SOCKS5 -> "socks5"
+          UpstreamKind.NONE -> ""
+        }
+    try {
+      Libtailscale.setForcedUpstream(kind, cfg.host, cfg.port, cfg.username, cfg.password, cfg.failClosed)
+    } catch (e: Exception) {
+      TSLog.e(TAG, "forced upstream: ${e.message}")
+      clearForced()
+    }
+  }
+
+  fun clearForced() {
+    try {
+      Libtailscale.clearForcedUpstream()
+    } catch (_: Exception) {
+    }
+  }
 }
 
 object MeshProxyNotifier {

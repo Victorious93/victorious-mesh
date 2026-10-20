@@ -15,6 +15,12 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Forced full-traffic upstream proxy (Settings → Proxy).** Off by
+  default. TUN-to-SOCKS5/HTTP-CONNECT in libtailscale sends app TCP
+  (and SOCKS5 UDP ASSOCIATE) through the chosen proxy with credentials.
+  Fail-closed blocks those flows if the proxy drops. Mesh IPs stay on
+  the mesh; the proxy host is excluded to prevent a routing loop. DNS
+  and IPv6 gaps are documented. No new fleet ops. **[not device-verified]**
 - **Per-app routing (Settings → Per-app routing).** Direct bypass via
   `addDisallowedApplication`. Exit node and upstream proxy choices are
   saved but cannot be applied per app on one VpnService (device-wide

@@ -27,9 +27,11 @@ data class UpstreamProxyConfig(
     val port: Int = DEFAULT_UPSTREAM_PORT,
     val username: String = "",
     val password: String = "",
+    val forced: Boolean = false,
+    val failClosed: Boolean = false,
 ) {
   override fun toString(): String =
-      "UpstreamProxyConfig(kind=$kind, host=$host, port=$port, username=${username.isNotEmpty()}, password=***)"
+      "UpstreamProxyConfig(kind=$kind, host=$host, port=$port, username=${username.isNotEmpty()}, password=***, forced=$forced, failClosed=$failClosed)"
 }
 
 const val DEFAULT_MESH_PORT = 1080
@@ -60,6 +62,8 @@ class ProxyStore(private val store: SecretStore) {
           port = store.get(KEY_UP_PORT)?.toIntOrNull() ?: DEFAULT_UPSTREAM_PORT,
           username = store.get(KEY_UP_USER).orEmpty(),
           password = store.get(KEY_UP_PASS).orEmpty(),
+          forced = store.get(KEY_UP_FORCED) == "1",
+          failClosed = store.get(KEY_UP_FAILCLOSED) == "1",
       )
 
   fun saveUpstream(cfg: UpstreamProxyConfig) {
@@ -68,6 +72,8 @@ class ProxyStore(private val store: SecretStore) {
     store.put(KEY_UP_PORT, cfg.port.toString())
     store.put(KEY_UP_USER, cfg.username)
     store.put(KEY_UP_PASS, cfg.password)
+    store.put(KEY_UP_FORCED, if (cfg.forced) "1" else "0")
+    store.put(KEY_UP_FAILCLOSED, if (cfg.failClosed) "1" else "0")
   }
 
   companion object {
@@ -80,6 +86,8 @@ class ProxyStore(private val store: SecretStore) {
     private const val KEY_UP_PORT = "proxy.up.port"
     private const val KEY_UP_USER = "proxy.up.user"
     private const val KEY_UP_PASS = "proxy.up.pass"
+    private const val KEY_UP_FORCED = "proxy.up.forced"
+    private const val KEY_UP_FAILCLOSED = "proxy.up.failclosed"
   }
 }
 
@@ -120,14 +128,30 @@ object ProxyPlanner {
     return n.startsWith("fd7a:115c:a1e0:") || n == "fd7a:115c:a1e0::" || n.startsWith("fd7a:115c:a1e0::")
   }
 
-  fun planOutbound(kind: UpstreamKind, host: String, port: Int, sdkInt: Int): OutboundPlan {
+  fun planOutbound(
+      kind: UpstreamKind,
+      host: String,
+      port: Int,
+      sdkInt: Int,
+      forced: Boolean = false,
+  ): OutboundPlan {
     if (kind == UpstreamKind.NONE || host.isBlank() || !validPort(port)) {
-      return OutboundPlan(applyHttpProxy = false, excludeHost = null, reason = "disabled")
+      return OutboundPlan(applyHttpProxy = false, excludeHost = null, forced = false, reason = "disabled")
+    }
+    val exclude = host.takeIf { it.looksLikeLiteralIp() && !looksLikeMesh(it) }
+    if (forced) {
+      return OutboundPlan(
+          applyHttpProxy = kind == UpstreamKind.HTTP && sdkInt >= 29,
+          excludeHost = exclude,
+          forced = true,
+          reason = "forced TUN-to-proxy in libtailscale; credentials applied; fail-closed blocks leaks",
+      )
     }
     if (kind == UpstreamKind.SOCKS5) {
       return OutboundPlan(
           applyHttpProxy = false,
           excludeHost = null,
+          forced = false,
           reason = "SOCKS5 cannot be applied to all apps; VpnService has no SOCKS API",
       )
     }
@@ -135,15 +159,14 @@ object ProxyPlanner {
       return OutboundPlan(
           applyHttpProxy = false,
           excludeHost = null,
+          forced = false,
           reason = "setHttpProxy requires Android 10",
       )
     }
-    // Exclude only non-mesh literal IPs so we can reach an internet proxy
-    // without a VPN routing loop. A mesh-IP upstream must stay inside the VPN.
-    val exclude = host.takeIf { it.looksLikeLiteralIp() && !looksLikeMesh(it) }
     return OutboundPlan(
         applyHttpProxy = true,
         excludeHost = exclude,
+        forced = false,
         reason = "advisory HTTP proxy via VpnService; apps may ignore it",
     )
   }
@@ -155,5 +178,6 @@ object ProxyPlanner {
 data class OutboundPlan(
     val applyHttpProxy: Boolean,
     val excludeHost: String?,
+    val forced: Boolean = false,
     val reason: String,
 )

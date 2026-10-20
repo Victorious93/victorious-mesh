@@ -5,6 +5,8 @@ go 1.27.1
 require (
 	github.com/tailscale/wireguard-go v0.0.0-20260928213032-417aef361226
 	golang.org/x/mobile v0.0.0-20240806205939-81131f6468ab
+	golang.org/x/net v0.59.0
+	gvisor.dev/gvisor v0.0.0-20260915211658-a6f909f08a72
 	tailscale.com v1.105.0-pre.0.20261001110716-689a0c155f57
 )
 
@@ -81,7 +83,6 @@ require (
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
@@ -91,5 +92,4 @@ require (
 	golang.org/x/tools v0.50.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard/windows v1.0.1 // indirect
-	gvisor.dev/gvisor v0.0.0-20260915211658-a6f909f08a72 // indirect
 )

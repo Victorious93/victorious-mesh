@@ -80,7 +80,9 @@ func (b *backend) updateTUN(rcfg *router.Config, dcfg *dns.OSConfig) (err error)
 	b.logger.Logf("updateTUN: changed")
 	defer b.logger.Logf("updateTUN: finished")
 
-	if disableTUN := len(rcfg.LocalAddrs) == 0; disableTUN {
+	rcfg = applyForcedRoutes(rcfg)
+
+	if disableTUN := rcfg == nil || len(rcfg.LocalAddrs) == 0; disableTUN {
 		b.logger.Logf("updateTUN: closing old TUNs")
 		b.CloseTUNs()
 		b.logger.Logf("updateTUN: closed old TUNs")
@@ -232,6 +234,7 @@ func (b *backend) updateTUN(rcfg *router.Config, dcfg *dns.OSConfig) (err error)
 		closeFileDescriptor()
 		return err
 	}
+	tunDev = wrapForcedTUN(tunDev)
 	b.logger.Logf("updateTUN: created TUN device")
 
 	b.devices.add(tunDev)

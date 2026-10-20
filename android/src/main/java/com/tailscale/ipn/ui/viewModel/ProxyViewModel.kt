@@ -5,6 +5,7 @@ package com.tailscale.ipn.ui.viewModel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import com.tailscale.ipn.App
 import com.tailscale.ipn.proxy.MeshProxyConfig
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
@@ -60,23 +61,51 @@ class ProxyViewModel(app: Application) : AndroidViewModel(app) {
     if (next.enabled) applyMesh()
   }
 
-  fun setUpstream(kind: UpstreamKind, host: String, port: String, user: String, pass: String) {
+  fun setUpstream(
+      kind: UpstreamKind,
+      host: String,
+      port: String,
+      user: String,
+      pass: String,
+      forced: Boolean = upstream.value.forced,
+      failClosed: Boolean = upstream.value.failClosed,
+  ) {
     val p = port.toIntOrNull() ?: upstream.value.port
     if (kind != UpstreamKind.NONE && !ProxyPlanner.validPort(p)) {
       message.set("Upstream port must be 1024–65535")
       return
     }
+    val u = user.trim()
+    if (kind != UpstreamKind.NONE && !ProxyPlanner.authComplete(u, pass)) {
+      message.set("Set both a username and a password, or leave both empty")
+      return
+    }
     val next =
-        UpstreamProxyConfig(kind = kind, host = host.trim(), port = p, username = user.trim(), password = pass)
+        UpstreamProxyConfig(
+            kind = kind,
+            host = host.trim(),
+            port = p,
+            username = u,
+            password = pass,
+            forced = forced && kind != UpstreamKind.NONE,
+            failClosed = failClosed,
+        )
+    val needsRestart = next.forced || upstream.value.forced
     store.saveUpstream(next)
     upstream.set(next)
+    val ctx = getApplication<Application>()
+    MeshProxyController.syncForced(ctx)
+    if (needsRestart) {
+      App.get().restartVPN()
+    }
     message.set(
-        when (kind) {
-          UpstreamKind.NONE -> "Upstream proxy off. Reconnect the mesh for this to apply."
-          UpstreamKind.HTTP ->
-              "HTTP upstream is advisory (Android 10+). Apps may ignore it. Reconnect the mesh to apply."
-          UpstreamKind.SOCKS5 ->
-              "SOCKS5 cannot be applied to all apps on this phone. Settings are saved only."
+        when {
+          kind == UpstreamKind.NONE -> "Upstream proxy off. Reconnect the mesh for this to apply."
+          next.forced ->
+              "Forced TUN-to-proxy is on. TCP (and SOCKS5 UDP ASSOCIATE) goes through the proxy. Reconnect if the mesh is already up."
+          kind == UpstreamKind.HTTP ->
+              "HTTP upstream is advisory (Android 10+) unless you turn on Force all traffic. Apps may ignore it."
+          else -> "SOCKS5 is save-only unless you turn on Force all traffic."
         }
     )
   }
