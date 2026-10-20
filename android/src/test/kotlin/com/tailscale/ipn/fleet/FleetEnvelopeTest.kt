@@ -58,6 +58,8 @@ class FleetEnvelopeTest {
       val confirmations: ConfirmationRegistry = ConfirmationRegistry(),
       val sink: RecordingSink = RecordingSink(),
       val capabilities: List<RemoteCapability> = RemoteCapability.DEFAULTS,
+      val knownNodeRefs: Set<String>? = null,
+      val pairing: NodePairing = NodePairing { _, target -> target == node },
   ) {
     val dispatcher =
         FleetDispatcher(
@@ -68,6 +70,8 @@ class FleetEnvelopeTest {
             confirmations = confirmations,
             confirmationSink = sink,
             capabilities = capabilities,
+            knownNodeRefs = knownNodeRefs,
+            pairing = pairing,
         )
 
     fun call(
@@ -212,6 +216,16 @@ class FleetEnvelopeTest {
   }
 
   @Test
+  fun invalidParametersOnMalformedTarget() {
+    assertCat("invalid_parameters", Harness().call(env("capabilities.get", target = "mesh-0123")))
+    assertCat(
+        "invalid_parameters",
+        Harness().call(env("capabilities.get", target = "mesh-0123456789ABCDEF0123456789ABCDEF")),
+    )
+    assertCat("invalid_parameters", Harness().call(env("capabilities.get", target = "not-a-node")))
+  }
+
+  @Test
   fun invalidParametersOnBlankActionRef() {
     assertCat("invalid_parameters", Harness().call(env("remote.command", actionRef = "")))
   }
@@ -227,8 +241,17 @@ class FleetEnvelopeTest {
   }
 
   @Test
-  fun notPairedOnWrongTarget() {
+  fun notFoundOnUnknownTarget() {
     val r = Harness().call(env("remote.command", actionRef = "mesh.status", target = other))
+    assertCat("not_found", r)
+    assertEquals(node, r.nodeId)
+  }
+
+  @Test
+  fun notPairedWhenKnownNodeNotPairedWithSender() {
+    val r =
+        Harness(pairing = NodePairing { _, _ -> false })
+            .call(env("remote.command", actionRef = "mesh.status"))
     assertCat("not_paired", r)
     assertEquals(node, r.nodeId)
   }
@@ -290,19 +313,27 @@ class FleetEnvelopeTest {
   }
 
   @Test
-  fun expiredByPastSkew() {
+  fun fullThreeHundredSecondTtlIsUsable() {
     val h = Harness()
-    assertCat("expired", h.call(env("capabilities.get", timestampMs = now0 - 130_000, ttlMs = 300_000)))
+    assertTrue(h.call(env("capabilities.get", timestampMs = now0 - 250_000, ttlMs = 300_000)).ok)
+    assertTrue(h.call(env("capabilities.get", timestampMs = now0 - 130_000, ttlMs = 300_000)).ok)
   }
 
   @Test
-  fun expiredByFutureSkew() {
+  fun expiredWhenNowPastTimestampPlusTtl() {
+    val h = Harness()
+    assertCat("expired", h.call(env("capabilities.get", timestampMs = now0 - 300_001, ttlMs = 300_000)))
+  }
+
+  @Test
+  fun expiredByFutureSkewOnly() {
     val h = Harness()
     assertCat("expired", h.call(env("capabilities.get", timestampMs = now0 + 130_000)))
+    assertTrue(h.call(env("capabilities.get", timestampMs = now0 + 119_000)).ok)
   }
 
   @Test
-  fun withinSkewAndTtlSucceeds() {
+  fun withinTtlSucceeds() {
     val h = Harness()
     assertTrue(h.call(env("capabilities.get", timestampMs = now0 - 10_000, ttlMs = 60_000)).ok)
   }
@@ -312,6 +343,8 @@ class FleetEnvelopeTest {
     assertEquals(300_000L, FleetProtocol.clampTtl(400_000))
     val h = Harness()
     assertTrue(h.call(env("capabilities.get", ttlMs = 400_000)).ok)
+    h.clock.set(now0 + 300_001)
+    assertCat("expired", h.call(env("capabilities.get", timestampMs = now0, ttlMs = 400_000, nonce = nextNonce())))
   }
 
   @Test
@@ -321,6 +354,14 @@ class FleetEnvelopeTest {
     assertTrue(h.call(env("capabilities.get", nonce = nonce, timestampMs = now0)).ok)
     h.clock.set(now0 + 120_001)
     assertCat("expired", h.call(env("capabilities.get", timestampMs = now0, nonce = nextNonce())))
+  }
+
+  @Test
+  fun isExpiredAndFutureSkewHelpers() {
+    assertFalse(FleetDispatcher.isExpired(now0, 300_000, now0 + 250_000))
+    assertTrue(FleetDispatcher.isExpired(now0, 300_000, now0 + 300_001))
+    assertFalse(FleetDispatcher.isFutureSkew(now0 + 120_000, now0))
+    assertTrue(FleetDispatcher.isFutureSkew(now0 + 120_001, now0))
   }
 
   @Test

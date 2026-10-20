@@ -48,8 +48,9 @@ Victorious Mesh itself is signed with its own, separate release key.
 - The answer comes back as `what = 2`, Bundle key `"response"` (JSON string).
 
 JSON, `protocol_major` 1, `protocol_minor` 1. A request that contains top-level
-`op` is a v1.1 remote envelope. A request that contains `operation` (and no `op`)
-is a legacy `mesh.*` BridgeRequest.
+`op` is a v1.1 remote envelope (camelCase fields). A request that contains
+`operation` (and no `op`) is a legacy `mesh.*` BridgeRequest. Responses keep the
+snake_case wrapper (`protocol_major`, `protocol_minor`, `request_id`, `node_id`).
 
 ## Node id
 
@@ -59,8 +60,11 @@ Each install makes one id like `mesh-` followed by 32 lowercase hex characters a
 - Envelope: put it in `targetNodeRef`.
 
 Any response except `unauthorized` / `unauthorized_caller` includes `node_id`, so
-the controller can learn it (a mismatched target returns `not_paired` or
-`node_mismatch` with this phone's id).
+the controller can learn it. Envelope `targetNodeRef` is classified as:
+blank or malformed (`mesh-` + 32 lowercase hex) → `invalid_parameters`; a
+well-formed id this phone does not know → `not_found`; this phone's id when
+the sender is not paired with it → `not_paired`. Legacy `target_node_id`
+mismatch is still `node_mismatch`.
 
 ## Legacy operations (`mesh.*`)
 
@@ -103,8 +107,9 @@ through the same auth, gating, and capability checks as a standalone command.
 
 ### Replay and expiry
 
-An envelope is `expired` when `now > timestampMs + ttlMs`, or when
-`|now - timestampMs| > 120000` (clock skew).
+An envelope is `expired` when `now > timestampMs + ttlMs`. A timestamp more
+than 120 seconds in the future (`timestampMs > now + 120000`) is also
+`expired`. There is no past-skew window, so a full 300 second TTL is usable.
 
 A duplicate nonce keyed by `(sourceNodeRef, nonce)` is `replay_detected`.
 `sourceNodeRef` is the **caller identity** from `Message.sendingUid` (package
@@ -154,13 +159,13 @@ Remote envelope v1.1 uses:
 
 | Category | Meaning |
 |---|---|
-| `invalid_parameters` | Missing/bad envelope fields, bad `ttlMs` / `nonce`, unexpected `params`, bad `onError`. |
-| `not_paired` | `targetNodeRef` is not this phone. |
-| `not_found` | Unknown `actionRef`, or no matching pending confirmation. |
+| `invalid_parameters` | Missing/bad envelope fields, blank or malformed `targetNodeRef`, bad `ttlMs` / `nonce`, unexpected `params`, bad `onError`. |
+| `not_paired` | `targetNodeRef` is this (known) node, but it is not paired with the sender. |
+| `not_found` | Unknown / unresolvable `targetNodeRef`, unknown `actionRef`, or no matching pending confirmation. |
 | `internal` | Something went wrong inside the app. |
 | `unauthorized` | Calling app is not on the allowlist (wrong package or certificate). |
 | `replay_detected` | This caller already used this nonce. |
-| `expired` | Past `timestampMs + ttlMs`, or clock skew greater than 120 seconds. |
+| `expired` | `now > timestampMs + ttlMs`, or `timestampMs` is more than 120 seconds in the future. |
 | `external_control_disabled` | The Settings switch is off (everything except `capabilities.get`). |
 | `confirmation_required` | Destructive action waiting for an on-phone Approve. |
 | `unsupported_op` | `op` is not one of the four envelope operations. |
@@ -204,3 +209,6 @@ Request:
  "timestampMs":1760928000000,"ttlMs":120000,
  "destructive":false,"trigger":{}}
 ```
+
+Device behaviour (Messenger bind, notification Approve/Deny, live WireGuard +
+envelope) is **[not device-verified]**.

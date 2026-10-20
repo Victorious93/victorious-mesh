@@ -55,7 +55,8 @@ object FleetProtocol {
 
   const val DEFAULT_TTL_MS = 120_000L
   const val MAX_TTL_MS = 300_000L
-  const val MAX_SKEW_MS = 120_000L
+  /** Future-only skew: reject when timestampMs > now + this (past timestamps use TTL only). */
+  const val MAX_FUTURE_SKEW_MS = 120_000L
   const val NONCE_RETAIN_MS = 10L * 60L * 1000L
   const val NONCE_CACHE_MAX_ENTRIES = 4096
 
@@ -389,13 +390,23 @@ object CallerAllowlist {
  * Remote envelope v1.1 check order:
  * 1. caller allowlist -> unauthorized
  * 2. JSON parse / required fields -> invalid_parameters
- * 3. targetNodeRef -> not_paired
+ * 3. targetNodeRef: blank/malformed -> invalid_parameters; unknown -> not_found;
+ *    known but not paired with sender -> not_paired
  * 4. ttl / nonce format -> invalid_parameters (ttl above max is clamped)
- * 5. expiry / clock skew -> expired
+ * 5. now > timestampMs+ttlMs, or timestampMs > now+120s future skew -> expired
  * 6. duplicate (sourceNodeRef, nonce) -> replay_detected
  * 7. external control (except capabilities.get) -> external_control_disabled
  * 8. op / action / capability / confirmation / mesh action
  */
+/**
+ * Which node refs this phone knows, and which callers are paired with them.
+ * Default: this install's node id is the only known node; any allowlisted sender
+ * is treated as paired with it. Pairing is never taken from envelope fields.
+ */
+fun interface NodePairing {
+  fun isPaired(sourceNodeRef: String, targetNodeRef: String): Boolean
+}
+
 class FleetDispatcher(
     private val nodeId: String,
     private val backend: MeshBackend,
@@ -404,6 +415,8 @@ class FleetDispatcher(
     private val confirmations: ConfirmationRegistry = ConfirmationRegistry(),
     private val confirmationSink: ConfirmationSink = ConfirmationSink {},
     private val capabilities: List<RemoteCapability> = RemoteCapability.DEFAULTS,
+    private val knownNodeRefs: Set<String>? = null,
+    private val pairing: NodePairing = NodePairing { _, target -> target == nodeId },
 ) {
 
   fun handle(
@@ -499,10 +512,14 @@ class FleetDispatcher(
         )
     if (env.requestId.isBlank())
         return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "requestId must be non-empty")
-    if (env.targetNodeRef.isBlank())
-        return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "targetNodeRef must be non-empty")
-    if (env.targetNodeRef != nodeId)
-        return err(env.requestId, ErrorCategory.NOT_PAIRED, "targetNodeRef does not match this node")
+    val target = env.targetNodeRef
+    if (target.isBlank() || !FleetProtocol.isValidNodeId(target))
+        return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "targetNodeRef is blank or malformed")
+    val known = knownNodeRefs ?: setOf(nodeId)
+    if (target !in known)
+        return err(env.requestId, ErrorCategory.NOT_FOUND, "targetNodeRef is unknown or unresolvable")
+    if (!pairing.isPaired(sourceNodeRef, target))
+        return err(env.requestId, ErrorCategory.NOT_PAIRED, "targetNodeRef is not paired with this caller")
     if (!FleetProtocol.isValidNonce(env.nonce))
         return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "nonce must be a 128-bit hex or UUID")
     val ttl =
@@ -512,6 +529,8 @@ class FleetDispatcher(
           return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid ttlMs")
         }
     val now = clock()
+    if (isFutureSkew(env.timestampMs, now))
+        return err(env.requestId, ErrorCategory.EXPIRED, "timestampMs is more than 120s in the future")
     if (isExpired(env.timestampMs, ttl, now))
         return err(env.requestId, ErrorCategory.EXPIRED, "envelope expired")
     if (nonceCache.seen(sourceNodeRef, env.nonce, now))
@@ -791,11 +810,11 @@ class FleetDispatcher(
       return ips.firstOrNull { !it.contains(':') } to ips.firstOrNull { it.contains(':') }
     }
 
-    fun isExpired(timestampMs: Long, ttlMs: Long, nowMs: Long): Boolean {
-      if (nowMs > timestampMs + ttlMs) return true
-      val skew = nowMs - timestampMs
-      return kotlin.math.abs(skew) > FleetProtocol.MAX_SKEW_MS
-    }
+    fun isExpired(timestampMs: Long, ttlMs: Long, nowMs: Long): Boolean =
+        nowMs > timestampMs + ttlMs
+
+    fun isFutureSkew(timestampMs: Long, nowMs: Long): Boolean =
+        timestampMs > nowMs + FleetProtocol.MAX_FUTURE_SKEW_MS
 
     private fun resolveTtl(raw: String?, env: RemoteEnvelope): Long {
       val explicit = peekTtlElement(raw)

@@ -15,3 +15,7 @@
   `capabilities.get`, `remote.command`, `macro.step`, `macro.run` on the existing
   Messenger transport. Replay/expiry/nonce cache, destructive `mesh.down` confirmation
   on the phone, and `trigger.*` never authorizes. Legacy `mesh.*` ops stay compatible.
+- Fleet envelope v1.1 follow-up (ratified): expiry is `now > timestampMs+ttlMs` or
+  future skew `timestampMs > now+120s` only (full 300s TTL is usable). `targetNodeRef`
+  blank/malformed → `invalid_parameters`, unknown → `not_found`, known but unpaired →
+  `not_paired`. CamelCase envelope + snake_case wrapper unchanged.
