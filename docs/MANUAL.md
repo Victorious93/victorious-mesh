@@ -134,6 +134,46 @@ You can run a standard WireGuard tunnel **instead of** the mesh. They never run 
 
 While a WireGuard profile is connected, the fleet controller sees the **mesh as down** (not connected, no mesh IPs). Asking it to turn the mesh on (`mesh.up`) is **refused** until you switch back to mesh mode in the app. Turning the mesh off remotely does nothing extra in this mode, because the mesh is already off.
 
+### Proxy
+
+![Proxy](images/manual/proxy.png)
+
+*Screenshot pending.*
+
+**Settings → Proxy**
+
+Two independent features, both **off by default**. **[not device-verified]** — live bind, notification, and leak behaviour on a real phone have not been checked.
+
+#### Share this phone as a mesh proxy
+
+Other devices on the mesh can send **HTTP CONNECT** or **SOCKS5** traffic through this phone, so this phone is an exit for that traffic. Both protocols share one port (the same userspace listeners the mesh engine already has).
+
+1. Connect the mesh first. The listener needs this phone's mesh IPv4.
+2. Open **Settings → Proxy**.
+3. Turn on **Listen on the mesh IP**.
+4. Optionally set a port (1024–65535, default 1080).
+5. Optionally set a username and password. Use both or neither. They are stored only in this app's encrypted preferences (Android Keystore).
+6. A persistent notification stays up while the listener is running.
+
+**Bind rules.** The listener binds only this phone's own mesh IPv4 (the `100.64`–`100.127` address). It never binds `0.0.0.0`, never Wi‑Fi, and never cellular. Other mesh nodes reach it at `100.x.y.z:port`. IPv6-only nodes cannot start the listener yet.
+
+**While WireGuard mode is on**, the mesh proxy stays off.
+
+There is **no fleet operation** for this. The Fleet Orchestrator must ratify any later remote control.
+
+#### Send this phone through an upstream proxy
+
+This is the other direction: apps on this phone would send internet traffic through an external HTTP or SOCKS5 server.
+
+**What is implemented**
+
+- **HTTP on Android 10 and newer:** the VPN tells Android about that proxy (`VpnService.Builder.setHttpProxy`). That is **advisory**. Apps that ignore the system HTTP proxy do **not** go through it.
+- Username and password for an upstream proxy are stored encrypted, but Android's API has **no credential field**, so they cannot be applied.
+- If the proxy host is a **literal public or LAN IP**, Android 13+ excludes that IP from the VPN so the phone can still reach the proxy on Wi‑Fi or cellular (avoids a routing loop). A **hostname** cannot be excluded that way. A **mesh IP** upstream is left inside the VPN on purpose.
+- **SOCKS5:** settings are saved only. Android has no all-app SOCKS5 API on the VPN builder. Rewriting every socket through SOCKS5 in the mesh engine is out of scope.
+
+**Leak limit — this cannot promise no leak.** `setHttpProxy` is advisory. Apps that do not honor it send traffic through the VPN (or the underlay) without the proxy. SOCKS5 cannot be applied to every app. After you change these settings, disconnect and reconnect the mesh.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -217,7 +257,7 @@ Victorious Mesh asks for the following. Android's VPN permission is separate fro
 | Network state | Notices when Wi‑Fi or mobile data changes so the mesh can recover. |
 | Wi‑Fi state | Lets the mesh see Wi‑Fi changes (declared for the VPN stack). |
 | Change network state | Lets the VPN attach to the system network (declared for the VPN stack). |
-| Notifications | Alerts for connection health, sign-in expiry, and Mesh Drop. You can leave the persistent status notification off in system settings. |
+| Notifications | Alerts for connection health, sign-in expiry, Mesh Drop, and the persistent mesh-proxy notification while that listener is on. You can leave the VPN status notification off in system settings. |
 | Storage (Android 10 and older) | Saves incoming Mesh Drop files on older Android versions. |
 | Foreground service | Keeps the VPN running while the app is in the background. |
 | Query all packages | Builds the list of installed apps for split tunneling. |
@@ -343,6 +383,10 @@ under **Settings → WireGuard**.
 
 **The mesh will not start, and I use WireGuard.** Open **Settings → WireGuard** and tap **Switch back to mesh mode** (or **Disconnect**), then connect the mesh from the main screen.
 
+**The mesh proxy will not start.** Connect the mesh first (not WireGuard). The listener needs this phone's `100.x` address. Check the port is 1024–65535, and that username and password are both set or both empty. **[not device-verified]**
+
+**Internet still bypasses my upstream proxy.** HTTP upstream is advisory (Android 10+). Apps may ignore it, so leaks are possible. SOCKS5 cannot be applied to every app. This is not a leak-proof upstream. See **Settings → Proxy**.
+
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 
 **Debug vs release.** Debug and release both install as `com.victorious.mesh`. Debug builds from CI share a fixed debug signature. Release builds use a separate key that is not stored in the project.
@@ -351,7 +395,7 @@ under **Settings → WireGuard**.
 
 - **Diagnostic log upload is disabled.** The app does not send diagnostic logs to a remote log server. That path is switched off in the build (always reports logging as off; remote upload cannot be turned on). Logs that the VPN core writes stay on the device.
 - **There is no in-app bug-report upload.** The old report screen is not linked from Settings, because it targeted that remote log server.
-- **Keys stay on this device.** Login and node keys are stored in encrypted app storage. Extra hardware-backed keys use the Android Keystore when the phone supports it. Auth keys you paste are handed to the local VPN engine for login; they are not written to the Control server preference. WireGuard configs, including private keys, stay in the same encrypted on-device store and are not written to logs or error messages. Android backup for this app is off, so those secrets are not copied to cloud backup.
+- **Keys stay on this device.** Login and node keys are stored in encrypted app storage. Extra hardware-backed keys use the Android Keystore when the phone supports it. Auth keys you paste are handed to the local VPN engine for login; they are not written to the Control server preference. WireGuard configs, including private keys, stay in the same encrypted on-device store and are not written to logs or error messages. Optional proxy usernames and passwords use that same encrypted store. Android backup for this app is off, so those secrets are not copied to cloud backup.
 - **The fleet bridge** returns status and IP addresses only — never keys, tokens, or file contents. Mesh IP addresses are not written to logs or backups.
 - **What the intro text still says.** The first-run paragraph mentions that a name, device name, OS version, and IP are used to connect devices. That text is shown in the app; this build does not upload diagnostic logs, and your Headscale server is the control plane you configured.
 - **Licensing.** Victorious Mesh is a modified open-source client (BSD-3-Clause). Credit to the original authors belongs in the license files (`LICENSE`, `NOTICE`, `PATENTS`) and on the About screen. This app is not affiliated with or endorsed by those original authors.

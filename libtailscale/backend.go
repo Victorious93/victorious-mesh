@@ -40,6 +40,10 @@ import (
 	"tailscale.com/wgengine/router"
 )
 
+// runningApp is the process-wide Application, for package-level
+// mesh proxy start/stop (gomobile cannot pass the App around easily).
+var runningApp atomic.Pointer[App]
+
 type App struct {
 	dataDir string
 
@@ -89,7 +93,11 @@ func start(dataDir, directFileRoot string, hwAttestationPref bool, appCtx AppCon
 		os.Setenv("HOME", dataDir)
 	}
 
-	return newApp(dataDir, directFileRoot, hwAttestationPref, appCtx)
+	app := newApp(dataDir, directFileRoot, hwAttestationPref, appCtx)
+	if a, ok := app.(*App); ok {
+		runningApp.Store(a)
+	}
+	return app
 }
 
 type backend struct {

@@ -106,6 +106,27 @@ refused until the user switches back to mesh mode in the app.
 `github.com/tailscale/wireguard-go` (MIT), on the same VpnService the mesh uses.
 No second Go runtime and no extra native library is added.
 
+## Proxy
+
+**Settings → Proxy.** Off by default. **[not device-verified]**
+
+**Share this phone:** other mesh nodes can use this phone as an HTTP CONNECT
+or SOCKS5 exit. One port (default 1080) serves both, using the mesh engine's
+built-in userspace listeners. The bind address is this node's mesh IPv4 only
+— never `0.0.0.0`, Wi-Fi, or cellular. Optional username/password live in
+EncryptedSharedPreferences. A persistent notification stays up while it
+runs. WireGuard mode turns it off.
+
+**Upstream:** HTTP on Android 10+ calls `VpnService.Builder.setHttpProxy`
+(advisory; apps may ignore it; no platform credential field). Literal
+non-mesh proxy IPs are excluded from the VPN on Android 13+ to avoid a
+routing loop. SOCKS5 settings are saved only — there is no all-app SOCKS
+API, and a TUN-to-SOCKS rewriter is out of scope. **This cannot promise
+no leak** when an upstream proxy is enabled.
+
+**Fleet bridge:** no new operations. The Orchestrator must ratify any later
+remote control.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

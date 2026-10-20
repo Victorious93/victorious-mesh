@@ -98,6 +98,7 @@ import com.tailscale.ipn.ui.view.TaildropDirectoryPickerPrompt
 import com.tailscale.ipn.ui.view.TailnetLockSetupView
 import com.tailscale.ipn.ui.view.UserSwitcherNav
 import com.tailscale.ipn.ui.view.UserSwitcherView
+import com.tailscale.ipn.ui.view.ProxyView
 import com.tailscale.ipn.ui.view.WireGuardView
 import com.tailscale.ipn.ui.viewModel.AppViewModel
 import com.tailscale.ipn.ui.viewModel.ExitNodePickerNav
@@ -343,6 +344,7 @@ class MainActivity : ComponentActivity() {
                   SettingsNav(
                       onNavigateToControlServer = { navController.navigate("controlServer") },
                       onNavigateToWireGuard = { navController.navigate("wireguard") },
+                      onNavigateToProxy = { navController.navigate("proxy") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -429,6 +431,7 @@ class MainActivity : ComponentActivity() {
               composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }
               composable("about") { AboutView(backTo("settings")) }
               composable("wireguard") { WireGuardView(backTo("settings")) }
+              composable("proxy") { ProxyView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(

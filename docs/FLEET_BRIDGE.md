@@ -281,6 +281,12 @@ and `mesh.up` is refused (`safety_refused`). `mesh.down` does not tear the
 WireGuard tunnel down. `node.status.get` reports `mesh` as `down` and
 `vpn` as `ok` ("WireGuard up") while that tunnel is active.
 
+### Proxy
+
+No fleet operations for the on-phone mesh proxy or the outbound/upstream
+proxy. Settings → Proxy is local only. The Fleet Orchestrator must ratify
+any later remote control.
+
 ## Errors
 
 Legacy `mesh.*` BridgeRequests still use the v1.0 categories

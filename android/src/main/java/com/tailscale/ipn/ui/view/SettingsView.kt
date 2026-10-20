@@ -119,6 +119,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.proxy_title,
+          subtitle = stringResource(R.string.proxy_settings_subtitle),
+          onClick = settingsNav.onNavigateToProxy,
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.split_tunneling,
           subtitle = stringResource(R.string.filter_apps_allowed_to_access_tailscale),
           onClick = settingsNav.onNavigateToSplitTunneling,
