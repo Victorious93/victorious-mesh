@@ -181,3 +181,39 @@ data class OutboundPlan(
     val forced: Boolean = false,
     val reason: String,
 )
+
+enum class ForcedDNSStatus {
+  OFF,
+  PENDING,
+  UDP,
+  TCP,
+  BLOCKED;
+
+  companion object {
+    fun fromRaw(raw: String): ForcedDNSStatus =
+        when (raw.lowercase()) {
+          "pending" -> PENDING
+          "udp" -> UDP
+          "tcp" -> TCP
+          "blocked" -> BLOCKED
+          else -> OFF
+        }
+  }
+}
+
+enum class ForcedIPv6Status {
+  OFF,
+  UNKNOWN,
+  VIA_PROXY,
+  BLOCKED;
+
+  companion object {
+    fun fromRaw(raw: String): ForcedIPv6Status =
+        when (raw.lowercase()) {
+          "unknown" -> UNKNOWN
+          "via_proxy" -> VIA_PROXY
+          "blocked" -> BLOCKED
+          else -> OFF
+        }
+  }
+}

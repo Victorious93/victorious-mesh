@@ -43,6 +43,29 @@ class ManualAssetTest {
   }
 
   @Test
+  fun forcedProxyDocumentsDnsAndIpv6() {
+    val stream = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)
+    assertNotNull(stream)
+    val text = stream!!.bufferedReader().use { it.readText() }
+    assertTrue(
+        "manual should document DNS through the proxy",
+        text.contains("public DNS (port 53) is sent through the proxy"),
+    )
+    assertTrue(
+        "manual should document IPv6 via proxy or block",
+        text.contains("IPv6 is sent through the proxy when the upstream supports it"),
+    )
+    assertTrue(
+        "manual should say IPv6 is never leaked",
+        text.contains("never leaked"),
+    )
+    assertTrue(
+        "old DNS gap wording must be gone",
+        !text.contains("System DNS may still use the mesh or platform resolver"),
+    )
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

@@ -76,6 +76,9 @@ func (s *Stack) HandleInbound(pkt []byte) {
 	if len(pkt) < 1 {
 		return
 	}
+	if IsIPv6(pkt) && IPv6State() == IPv6Blocked {
+		return
+	}
 	var proto tcpip.NetworkProtocolNumber
 	switch pkt[0] >> 4 {
 	case 4:
@@ -157,6 +160,10 @@ func (s *Stack) handleUDP(r *udp.ForwarderRequest) bool {
 	go func() {
 		defer s.wg.Done()
 		defer local.Close()
+		if dest.Port() == dnsPort {
+			s.proxyDNS(local, dest)
+			return
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		up, derr := s.dialer.DialUDP(ctx, dest)
 		cancel()
@@ -168,6 +175,23 @@ func (s *Stack) handleUDP(r *udp.ForwarderRequest) bool {
 		copyUDP(local, up)
 	}()
 	return true
+}
+
+func (s *Stack) proxyDNS(local net.PacketConn, dest netip.AddrPort) {
+	buf := make([]byte, 4096)
+	_ = local.SetDeadline(time.Now().Add(15 * time.Second))
+	n, addr, err := local.ReadFrom(buf)
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := s.dialer.ExchangeDNS(ctx, dest, buf[:n])
+	cancel()
+	if err != nil {
+		log.Printf("forced upstream dns %s: %v", dest, err)
+		return
+	}
+	_, _ = local.WriteTo(resp, addr)
 }
 
 func copyBoth(a, b net.Conn) {

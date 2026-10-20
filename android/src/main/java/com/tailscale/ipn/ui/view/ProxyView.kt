@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tailscale.ipn.proxy.ForcedDNSStatus
+import com.tailscale.ipn.proxy.ForcedIPv6Status
 import com.tailscale.ipn.proxy.UpstreamKind
 import com.tailscale.ipn.ui.viewModel.ProxyViewModel
 import com.victorious.mesh.R
@@ -43,6 +45,8 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
   val upstream by model.upstream.collectAsState()
   val running by model.running.collectAsState()
   val message by model.message.collectAsState()
+  val dnsState by model.dnsState.collectAsState()
+  val ipv6State by model.ipv6State.collectAsState()
   var portText by remember(mesh.port) { mutableStateOf(mesh.port.toString()) }
   var user by remember(mesh.username) { mutableStateOf(mesh.username) }
   var pass by remember { mutableStateOf(mesh.password) }
@@ -166,6 +170,7 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
               model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, forced = upstream.forced, failClosed = on)
             },
         )
+        ForcedPathStatus(dnsState, ipv6State)
         TextButton(onClick = { model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed) }) {
           Text(stringResource(R.string.proxy_save_upstream))
         }
@@ -189,6 +194,47 @@ private fun kindLabel(kind: UpstreamKind): String =
       UpstreamKind.NONE -> stringResource(R.string.proxy_kind_none)
       UpstreamKind.HTTP -> stringResource(R.string.proxy_kind_http)
       UpstreamKind.SOCKS5 -> stringResource(R.string.proxy_kind_socks5)
+    }
+
+@Composable
+private fun ForcedPathStatus(dns: ForcedDNSStatus, ipv6: ForcedIPv6Status) {
+  Text(
+      stringResource(R.string.proxy_path_heading),
+      style = MaterialTheme.typography.titleSmall,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.primary,
+  )
+  Text(
+      stringResource(R.string.proxy_dns_heading),
+      style = MaterialTheme.typography.labelLarge,
+      fontWeight = FontWeight.SemiBold,
+  )
+  Text(dnsLabel(dns), style = MaterialTheme.typography.bodyMedium)
+  Text(
+      stringResource(R.string.proxy_ipv6_heading),
+      style = MaterialTheme.typography.labelLarge,
+      fontWeight = FontWeight.SemiBold,
+  )
+  Text(ipv6Label(ipv6), style = MaterialTheme.typography.bodyMedium)
+}
+
+@Composable
+private fun dnsLabel(state: ForcedDNSStatus): String =
+    when (state) {
+      ForcedDNSStatus.OFF -> stringResource(R.string.proxy_dns_off)
+      ForcedDNSStatus.PENDING -> stringResource(R.string.proxy_dns_pending)
+      ForcedDNSStatus.UDP -> stringResource(R.string.proxy_dns_udp)
+      ForcedDNSStatus.TCP -> stringResource(R.string.proxy_dns_tcp)
+      ForcedDNSStatus.BLOCKED -> stringResource(R.string.proxy_dns_blocked)
+    }
+
+@Composable
+private fun ipv6Label(state: ForcedIPv6Status): String =
+    when (state) {
+      ForcedIPv6Status.OFF -> stringResource(R.string.proxy_ipv6_off)
+      ForcedIPv6Status.UNKNOWN -> stringResource(R.string.proxy_ipv6_unknown)
+      ForcedIPv6Status.VIA_PROXY -> stringResource(R.string.proxy_ipv6_via)
+      ForcedIPv6Status.BLOCKED -> stringResource(R.string.proxy_ipv6_blocked)
     }
 
 @Composable

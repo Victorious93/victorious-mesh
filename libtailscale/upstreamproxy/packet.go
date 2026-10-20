@@ -78,6 +78,24 @@ func IsMeshDest(pkt []byte) bool {
 	return ok && tsaddr.IsTailscaleIP(addr)
 }
 
+const dnsPort = 53
+
+// IsDNS reports whether pkt is TCP or UDP destined to port 53.
+func IsDNS(pkt []byte) bool {
+	proto, _, dst, ok := Transport(pkt)
+	return ok && dst == dnsPort && (proto == protoUDP || proto == protoTCP)
+}
+
+// IsMeshDNS is a DNS packet whose destination is a mesh / MagicDNS address.
+// Those stay on the mesh and are not rewritten through the upstream.
+func IsMeshDNS(pkt []byte) bool {
+	return IsDNS(pkt) && IsMeshDest(pkt)
+}
+
+func IsIPv6(pkt []byte) bool {
+	return len(pkt) > 0 && pkt[0]>>4 == 6
+}
+
 func DefaultRoutes() []netip.Prefix {
 	return []netip.Prefix{
 		netip.MustParsePrefix("0.0.0.0/0"),

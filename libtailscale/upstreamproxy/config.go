@@ -158,6 +158,11 @@ func Set(c Config) error {
 	}
 	if !c.Enabled() {
 		c = Config{}
+		resetDNSState()
+		resetIPv6State()
+	} else {
+		resetDNSState()
+		noteIPv6(IPv6Unknown)
 	}
 	mu.Lock()
 	current = c
@@ -175,4 +180,6 @@ func Clear() {
 	mu.Lock()
 	current = Config{}
 	mu.Unlock()
+	resetDNSState()
+	resetIPv6State()
 }

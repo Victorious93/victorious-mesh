@@ -172,9 +172,11 @@ This is the other direction: apps on this phone would send internet traffic thro
 - If the proxy host is a **literal public or LAN IP**, Android 13+ excludes that IP from the VPN so the phone can still reach the proxy on Wi‑Fi or cellular (avoids a routing loop). A **hostname** cannot be excluded that way. A **mesh IP** upstream is left inside the VPN on purpose.
 - **SOCKS5 (advisory):** settings are saved only unless you turn on **Force all traffic**.
 - **Force all traffic (off by default):** the mesh engine sends app TCP from the VPN through the proxy (HTTP CONNECT or SOCKS5) and applies username/password. UDP uses SOCKS5 UDP ASSOCIATE when the proxy supports it; otherwise UDP is blocked. Mesh `100.x` / `fd7a:…` addresses stay on the mesh. The proxy host is excluded from the VPN so the phone can still reach it (loop prevention). **[not device-verified]**
-- **Fail closed (off by default):** if the proxy is down, those flows are blocked instead of going around it.
+- **DNS (when Force all traffic is on):** public DNS (port 53) is sent through the proxy — SOCKS5 UDP ASSOCIATE when the proxy supports it, otherwise DNS over TCP (RFC 7766) via CONNECT or SOCKS5. Mesh / MagicDNS names stay on the mesh. DNS is fail-closed: if the proxy is down, public lookups are blocked instead of going out on Wi‑Fi or cellular. The Proxy screen shows the live DNS path (waiting / UDP / TCP / blocked). **[not device-verified]**
+- **IPv6 (when Force all traffic is on):** IPv6 is sent through the proxy when the upstream supports it; otherwise IPv6 is blocked and is never leaked on the underlay. The Proxy screen shows the live IPv6 path (checking / through the proxy / blocked). **[not device-verified]**
+- **Fail closed (off by default):** if the proxy is down, those flows are blocked instead of going around it. Public DNS is always fail-closed, even when this switch is off.
 
-**Gaps that remain.** System DNS may still use the mesh or platform resolver and is not rewritten through the proxy. IPv6 is captured when forced is on but many HTTP proxies are IPv4-only, so IPv6 flows fail closed. ICMP cannot go through SOCKS/CONNECT and is dropped. Apps set to **Direct** in Per-app routing skip the VPN and this path. WireGuard mode does not use the forced path. After you change these settings, disconnect and reconnect the mesh.
+**Gaps that remain.** ICMP cannot go through SOCKS/CONNECT and is dropped. Apps set to **Direct** in Per-app routing skip the VPN and this path. WireGuard mode does not use the forced path. After you change these settings, disconnect and reconnect the mesh.
 
 ### Per-app routing
 
@@ -479,7 +481,7 @@ under **Settings → WireGuard**.
 
 **The mesh proxy will not start.** Connect the mesh first (not WireGuard). The listener needs this phone's `100.x` address. Check the port is 1024–65535, and that username and password are both set or both empty. **[not device-verified]**
 
-**Internet still bypasses my upstream proxy.** Advisory HTTP (Android 10+) is not forced. Turn on **Force all traffic** to send VPN TCP through the proxy. UDP still needs SOCKS5 UDP ASSOCIATE. DNS, IPv6, ICMP, Direct apps, and WireGuard mode are documented gaps. See **Settings → Proxy**.
+**Internet still bypasses my upstream proxy.** Advisory HTTP (Android 10+) is not forced. Turn on **Force all traffic** to send VPN TCP, public DNS, and IPv6 through the proxy. UDP still needs SOCKS5 UDP ASSOCIATE. If the proxy cannot carry IPv6, IPv6 is blocked instead of leaking. ICMP, Direct apps, and WireGuard mode are documented gaps. See **Settings → Proxy**.
 
 **The kill switch is on but I still have internet after a drop.** Turn the main switch off only when you want to leave. Direct apps skip the VPN. If another VPN app took the slot, this app cannot hold it. Use Android **Always-on VPN** and **Block connections without VPN** for a system lock. **[not device-verified]**
 
