@@ -230,7 +230,7 @@ The controller **droidcommand-AI** (`ai.droidcommand.app`) can:
 
 - Read what this node supports
 - Read connection status (running or stopped, control server URL, mesh IP addresses)
-- Read a short **status tray** snapshot (`node.status.get`): mesh, VPN, and whether this app is alive. That answer does not include keys or IP addresses.
+- Read a short **status tray** snapshot (`node.status.get`): mesh, VPN, and whether this app is alive. That answer does not include keys or IP addresses. The controller asks with a normal bridge request; turning the mesh off remotely still needs the on-phone tap, but this status read does not.
 - Turn the mesh **on**
 - Turn the mesh **off**
 - Read this phone's mesh IPv4 and IPv6
@@ -273,6 +273,7 @@ Nothing in the controller's request — including any “trigger” or “alread
 The controller can send a newer kind of request on the same bridge. In plain language:
 
 - It can ask what this phone allows (`capabilities.get`) even when the Settings switch is off. That answer is a list only; it does not turn the mesh on or off.
+- It can ask for the status-tray snapshot (`node.status.get`) as its own read-only bridge request (with the same one-time, time-limited fields). That path does not go through the “turn the mesh off” confirmation. An older `remote.command` form still works as a compatible alias.
 - It can run one mesh action (`remote.command`) or a short list of steps (`macro.step` / `macro.run`). A “dry run” checks the list without doing anything.
 - Each request is time-limited (up to five minutes) and can be used only once, so an old or copied command is rejected. A request stamped more than two minutes in the future is also rejected. A command that is a few minutes old is still accepted if it is inside its time limit.
 - The command must name this phone. A blank or badly formed name is rejected as invalid. A well-formed name for some other phone is treated as not found. This phone, if the sender is not paired with it, is rejected as not paired.

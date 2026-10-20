@@ -46,6 +46,14 @@ class FleetNodeStatusTest {
     override fun down() {}
   }
 
+  private class RecordingSink : ConfirmationSink {
+    val pending = ArrayList<PendingConfirmation>()
+
+    override fun onConfirmationRequired(pending: PendingConfirmation) {
+      this.pending.add(pending)
+    }
+  }
+
   private inner class Harness(
       val backend: FakeBackend = FakeBackend(),
       val clock: java.util.concurrent.atomic.AtomicLong =
@@ -71,6 +79,30 @@ class FleetNodeStatusTest {
   private var nonceSeq = 0
 
   private fun nextNonce(): String = (++nonceSeq).toString(16).padStart(32, '0')
+
+  private fun canonical(
+      nonce: String = nextNonce(),
+      timestampMs: Long = now0,
+      ttlMs: Long? = 120000,
+      extraParams: String = "",
+      args: String? = null,
+      targetNodeRef: String? = node,
+      targetNodeId: String = node,
+  ): String {
+    val fields = ArrayList<String>()
+    fields.add("\"nonce\":\"$nonce\"")
+    fields.add("\"timestampMs\":$timestampMs")
+    if (ttlMs != null) fields.add("\"ttlMs\":$ttlMs")
+    fields.add("\"requestId\":\"dca-1\"")
+    if (targetNodeRef != null) fields.add("\"targetNodeRef\":\"$targetNodeRef\"")
+    fields.add("\"destructive\":false")
+    if (args != null) fields.add("\"args\":$args")
+    if (extraParams.isNotEmpty()) fields.add(extraParams)
+    return """{"protocol_major":1,"request_id":"dca-1","target_node_id":"$targetNodeId",
+      |"operation":"node.status.get","timeout_ms":10000,"parameters":{${fields.joinToString(",")}}}"""
+        .trimMargin()
+        .replace("\n", "")
+  }
 
   private fun env(
       op: String,
@@ -98,8 +130,8 @@ class FleetNodeStatusTest {
       }
 
   @Test
-  fun snapshotShapeViaRemoteCommand() {
-    val r = Harness().call(env("remote.command", actionRef = "node.status.get"))
+  fun snapshotShapeViaCanonicalBridgeRequest() {
+    val r = Harness().call(canonical())
     assertTrue(r.ok)
     val snap = r.result!!
     assertEquals(node, snap["nodeId"]!!.jsonPrimitive.content)
@@ -116,6 +148,14 @@ class FleetNodeStatusTest {
     val decoded = NodeStatusSnapshotCodec.decode(snap)
     assertEquals(node, decoded.nodeId)
     assertEquals(3, decoded.domains.size)
+  }
+
+  @Test
+  fun remoteCommandActionRefIsCompatibleAlias() {
+    val r = Harness().call(env("remote.command", actionRef = "node.status.get"))
+    assertTrue(r.ok)
+    assertEquals(node, r.result!!["nodeId"]!!.jsonPrimitive.content)
+    assertEquals("EXTERNAL_NODE", r.result!!["connectionClass"]!!.jsonPrimitive.content)
   }
 
   @Test
@@ -185,8 +225,7 @@ class FleetNodeStatusTest {
   @Test
   fun downServiceStillAnswersOk() {
     val r =
-        Harness(FakeBackend(connected = false, backendState = "Stopped"))
-            .call(env("remote.command", actionRef = "node.status.get"))
+        Harness(FakeBackend(connected = false, backendState = "Stopped")).call(canonical())
     assertTrue(r.ok)
     val domains = domainMap(r.result!!)
     assertEquals("down", domains.getValue("mesh")["state"]!!.jsonPrimitive.content)
@@ -197,8 +236,7 @@ class FleetNodeStatusTest {
   @Test
   fun statusReadFailureStillAnswersOk() {
     val r =
-        Harness(FakeBackend(throwOnStatus = true))
-            .call(env("remote.command", actionRef = "node.status.get"))
+        Harness(FakeBackend(throwOnStatus = true)).call(canonical())
     assertTrue(r.ok)
     val domains = domainMap(r.result!!)
     assertEquals("unknown", domains.getValue("mesh")["state"]!!.jsonPrimitive.content)
@@ -211,8 +249,7 @@ class FleetNodeStatusTest {
   @Test
   fun wireGuardModeMeshDownVpnUp() {
     val r =
-        Harness(FakeBackend(wireGuard = true))
-            .call(env("remote.command", actionRef = "node.status.get"))
+        Harness(FakeBackend(wireGuard = true)).call(canonical())
     assertTrue(r.ok)
     val domains = domainMap(r.result!!)
     assertEquals("down", domains.getValue("mesh")["state"]!!.jsonPrimitive.content)
@@ -237,15 +274,27 @@ class FleetNodeStatusTest {
 
   @Test
   fun unauthorizedCallerRejected() {
-    val r =
-        Harness()
-            .call(env("remote.command", actionRef = "node.status.get"), allowed = false)
-    assertCat("unauthorized", r)
+    val r = Harness().call(canonical(), allowed = false)
+    assertCat("unauthorized_caller", r)
     assertNull(r.nodeId)
   }
 
   @Test
   fun replayDetectedOnDuplicateNonce() {
+    val h = Harness()
+    val nonce = nextNonce()
+    assertTrue(h.call(canonical(nonce = nonce)).ok)
+    assertCat("replay_detected", h.call(canonical(nonce = nonce)))
+  }
+
+  @Test
+  fun expiredEnvelopeRejected() {
+    val r = Harness().call(canonical(timestampMs = now0 - 200_000))
+    assertCat("expired", r)
+  }
+
+  @Test
+  fun aliasStillChecksReplay() {
     val h = Harness()
     val nonce = nextNonce()
     assertTrue(h.call(env("remote.command", actionRef = "node.status.get", nonce = nonce)).ok)
@@ -256,56 +305,32 @@ class FleetNodeStatusTest {
   }
 
   @Test
-  fun expiredEnvelopeRejected() {
-    val r =
-        Harness()
-            .call(
-                env(
-                    "remote.command",
-                    actionRef = "node.status.get",
-                    timestampMs = now0 - 200_000,
-                )
-            )
-    assertCat("expired", r)
-  }
-
-  @Test
   fun argsNodeIdMismatchIsNotFound() {
-    val r =
-        Harness()
-            .call(
-                env(
-                    "remote.command",
-                    actionRef = "node.status.get",
-                    params = """{"args":{"nodeId":"$other"}}""",
-                )
-            )
+    val r = Harness().call(canonical(args = """{"nodeId":"$other"}"""))
     assertCat("not_found", r)
   }
 
   @Test
   fun argsNodeIdMalformedIsInvalidParameters() {
-    val r =
-        Harness()
-            .call(
-                env(
-                    "remote.command",
-                    actionRef = "node.status.get",
-                    params = """{"args":{"nodeId":"not-a-node"}}""",
-                )
-            )
+    val r = Harness().call(canonical(args = """{"nodeId":"not-a-node"}"""))
     assertCat("invalid_parameters", r)
   }
 
   @Test
   fun argsNodeIdThisNodeSucceeds() {
+    val r = Harness().call(canonical(args = """{"nodeId":"$node"}"""))
+    assertTrue(r.ok)
+    assertEquals(node, r.result!!["nodeId"]!!.jsonPrimitive.content)
+  }
+
+  @Test
+  fun unknownParamKeysAreIgnored() {
     val r =
         Harness()
             .call(
-                env(
-                    "remote.command",
-                    actionRef = "node.status.get",
-                    params = """{"args":{"nodeId":"$node"}}""",
+                canonical(
+                    extraParams = """"futureField":{"x":1},"trigger":{"autoApprove":true}""",
+                    args = """{"nodeId":"$node","extra":true}""",
                 )
             )
     assertTrue(r.ok)
@@ -313,21 +338,77 @@ class FleetNodeStatusTest {
   }
 
   @Test
-  fun legacyOperationReturnsSnapshot() {
+  fun missingNonceIsInvalidParameters() {
     val raw =
         """{"protocol_major":1,"request_id":"dca-1","target_node_id":"$node",
-          |"operation":"node.status.get","timeout_ms":10000,"parameters":{}}"""
+          |"operation":"node.status.get","timeout_ms":10000,"parameters":{"timestampMs":$now0}}"""
             .trimMargin()
             .replace("\n", "")
-    val r = Harness().call(raw)
+    assertCat("invalid_parameters", Harness().call(raw))
+  }
+
+  @Test
+  fun externalControlDisabledLikeOtherReadOps() {
+    assertCat("external_control_disabled", Harness().call(canonical(), enabled = false))
+  }
+
+  @Test
+  fun canonicalPathNeverRequestsConfirmation() {
+    val sink = RecordingSink()
+    val dispatcher =
+        FleetDispatcher(
+            node,
+            FakeBackend(),
+            clock = { now0 },
+            confirmationSink = sink,
+            capabilities =
+                listOf(
+                    RemoteCapability(
+                        FleetProtocol.OP_NODE_STATUS,
+                        FleetProtocol.KIND_DESTRUCTIVE,
+                        remoteAllowed = true,
+                        requiresConfirm = true,
+                    )
+                ),
+        )
+    val r = dispatcher.handle(canonical(), callerAllowed = true, controlEnabled = true, sourceNodeRef = src)
     assertTrue(r.ok)
-    assertEquals(node, r.result!!["nodeId"]!!.jsonPrimitive.content)
-    assertEquals("EXTERNAL_NODE", r.result!!["connectionClass"]!!.jsonPrimitive.content)
+    assertTrue(sink.pending.isEmpty())
+  }
+
+  @Test
+  fun aliasSkipsConfirmationGating() {
+    val sink = RecordingSink()
+    val dispatcher =
+        FleetDispatcher(
+            node,
+            FakeBackend(),
+            clock = { now0 },
+            confirmationSink = sink,
+            capabilities =
+                listOf(
+                    RemoteCapability(
+                        FleetProtocol.OP_NODE_STATUS,
+                        FleetProtocol.KIND_DESTRUCTIVE,
+                        remoteAllowed = true,
+                        requiresConfirm = true,
+                    )
+                ),
+        )
+    val r =
+        dispatcher.handle(
+            env("remote.command", actionRef = "node.status.get"),
+            callerAllowed = true,
+            controlEnabled = true,
+            sourceNodeRef = src,
+        )
+    assertTrue(r.ok)
+    assertTrue(sink.pending.isEmpty())
   }
 
   @Test
   fun producedSnapshotHasNoIpsOrSecrets() {
-    val r = Harness().call(env("remote.command", actionRef = "node.status.get"))
+    val r = Harness().call(canonical())
     val text = r.result.toString()
     assertFalse(text.contains("100.64.0.1"))
     assertFalse(text.contains("fd7a"))
