@@ -1,4 +1,10 @@
 import java.util.Properties
+import javax.inject.Inject
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -16,12 +22,30 @@ repositories {
 kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }
 
 // Bundle docs/MANUAL.md into the APK (and JVM unit-test classpath) at build time.
-val generatedManualAssets = layout.buildDirectory.dir("generated/manualAsset")
+abstract class CopyManualAssetTask @Inject constructor() : DefaultTask() {
+  @get:InputFile abstract val manualFile: RegularFileProperty
+
+  @get:OutputDirectory abstract val assetsOut: DirectoryProperty
+
+  @get:OutputDirectory abstract val testOut: DirectoryProperty
+
+  @TaskAction
+  fun copyManual() {
+    fun writeTo(root: java.io.File) {
+      val dest = root.resolve("docs")
+      dest.mkdirs()
+      manualFile.get().asFile.copyTo(dest.resolve("MANUAL.md"), overwrite = true)
+    }
+    writeTo(assetsOut.get().asFile)
+    writeTo(testOut.get().asFile)
+  }
+}
+
 val copyManualAsset =
-    tasks.register<Copy>("copyManualAsset") {
-      from(rootDir.resolve("../docs/MANUAL.md"))
-      into(generatedManualAssets.map { it.dir("docs") })
-      rename { "MANUAL.md" }
+    tasks.register<CopyManualAssetTask>("copyManualAsset") {
+      manualFile.set(rootDir.resolve("../docs/MANUAL.md"))
+      assetsOut.set(layout.buildDirectory.dir("generated/manualAsset"))
+      testOut.set(layout.buildDirectory.dir("generated/manualTestResources"))
     }
 
 android {
@@ -65,9 +89,9 @@ android {
   flavorDimensions += "version"
   namespace = "com.tailscale.ipn"
 
+  // JVM unit tests: static File, not a Provider (AGP 9 rejects Provider srcDir).
   sourceSets {
-    getByName("main") { assets.srcDir(generatedManualAssets) }
-    getByName("test") { resources.srcDir(generatedManualAssets) }
+    getByName("test") { resources.srcDir(file("build/generated/manualTestResources")) }
   }
 
   signingConfigs {
@@ -208,11 +232,21 @@ fun isTV(): Boolean {
   return project.findProperty("PLATFORM")?.toString() == "tv"
 }
 
+androidComponents {
+  onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(copyManualAsset) { task ->
+      task.assetsOut
+    }
+  }
+}
+
 tasks.matching { it.name.startsWith("preBuild") }.configureEach { dependsOn(copyManualAsset) }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
   dependsOn(copyManualAsset)
 }
-tasks.matching { it.name.contains("UnitTestResources") }.configureEach { dependsOn(copyManualAsset) }
+tasks.matching { it.name.contains("UnitTest") && it.name.contains("Res") }.configureEach {
+  dependsOn(copyManualAsset)
+}
 tasks.matching { it.name == "test" || it.name.startsWith("test") }.configureEach {
   dependsOn(copyManualAsset)
 }
