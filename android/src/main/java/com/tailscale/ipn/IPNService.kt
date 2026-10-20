@@ -9,7 +9,10 @@ import android.net.Network
 import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.system.OsConstants
+import com.tailscale.ipn.killswitch.KillSwitchController
+import com.tailscale.ipn.killswitch.KillSwitchEvent
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
@@ -33,6 +36,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   private lateinit var app: App
   val scope = CoroutineScope(Dispatchers.IO)
   private var closed = false
+  private var blackholeFd: ParcelFileDescriptor? = null
 
   override fun id(): String {
     return randomID
@@ -40,7 +44,15 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
   override fun updateVpnStatus(status: Boolean) {
     app.getAppScopedViewModel().setVpnActive(status)
-    if (status) refreshMeshProxy() else MeshProxyController.stop(this)
+    if (status) {
+      stopBlackhole()
+      refreshMeshProxy()
+    } else {
+      MeshProxyController.stop(this)
+      if (!closed && !KillSwitchController.userStopping) {
+        holdAndRestartIfArmed()
+      }
+    }
   }
 
   override fun onCreate() {
@@ -61,6 +73,8 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
       when (intent?.action) {
         ACTION_STOP_VPN -> {
+          KillSwitchController.apply(KillSwitchEvent.USER_STOP, vpnRunning = true)
+          stopBlackhole()
           app.setWantRunning(false)
           stopWireGuard()
           close()
@@ -87,11 +101,15 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           START_NOT_STICKY
         }
         ACTION_START_WIREGUARD -> {
+          KillSwitchController.apply(KillSwitchEvent.USER_START, vpnRunning = false)
+          stopBlackhole()
           showForegroundNotification()
           startWireGuard(intent.getStringExtra(EXTRA_WG_PROFILE_ID))
           START_STICKY
         }
         ACTION_START_VPN -> {
+          KillSwitchController.apply(KillSwitchEvent.USER_START, vpnRunning = false)
+          stopBlackhole()
           showForegroundNotification()
           // Mesh and WireGuard are mutually exclusive: tear WireGuard down first.
           stopWireGuard()
@@ -111,6 +129,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
                 UninitializedApp.getExitNodeName(Notifier.prefs.value, Notifier.netmap.value)
             app.notifyStatus(true, hideDisconnectAction.value, exitNodeName)
           }
+          KillSwitchController.apply(KillSwitchEvent.ALWAYS_ON_OR_RESTART, vpnRunning = false)
           val wgProfile = WireGuardManager.persistedWireGuardProfile()
           if (wgProfile != null) {
             startWireGuard(wgProfile)
@@ -124,6 +143,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           // This means that we were restarted after the service was killed
           // (potentially due to OOM).
           if (UninitializedApp.get().isAbleToStartVPN()) {
+            KillSwitchController.apply(KillSwitchEvent.ALWAYS_ON_OR_RESTART, vpnRunning = false)
             showForegroundNotification()
             App.get()
             val wgProfile = WireGuardManager.persistedWireGuardProfile()
@@ -188,15 +208,25 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun onDestroy() {
+    val restart =
+        KillSwitchController.store().enabled() &&
+            KillSwitchController.store().armed() &&
+            !KillSwitchController.userStopping
     NetworkChangeCallback.setUnderlyingNetworkListener(null)
+    stopBlackhole()
     close()
     updateVpnStatus(false)
     super.onDestroy()
+    if (restart && UninitializedApp.get().isAbleToStartVPN() && KillSwitchController.shouldRestartNow()) {
+      app.startVPN()
+    }
   }
 
   override fun onRevoke() {
     // VPN permission was granted to another app, so tell the Go backend and then set prepared to be
     // false so that when user attempts to connect again, VpnService.prepare() is called
+    KillSwitchController.apply(KillSwitchEvent.REVOKE, vpnRunning = true)
+    stopBlackhole()
     app.setWantRunning(false)
     setVpnPrepared(false)
     close()
@@ -206,6 +236,55 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
   private fun setVpnPrepared(isPrepared: Boolean) {
     app.getAppScopedViewModel().setVpnPrepared(isPrepared)
+  }
+
+  private fun holdAndRestartIfArmed() {
+    val decision =
+        KillSwitchController.apply(KillSwitchEvent.UNEXPECTED_DROP, vpnRunning = false)
+    if (decision.holdBlackhole) {
+      establishBlackhole()
+    }
+    if (decision.restartVpn && KillSwitchController.shouldRestartNow()) {
+      app.startVPN()
+    }
+  }
+
+  /**
+   * Minimal blocking VPN so traffic cannot use Wi-Fi/cellular while the mesh
+   * TUN is down. Replaced when [newBuilder] establishes the real tunnel.
+   * Dummy addresses are documentation ranges (TEST-NET-1 / 2001:db8).
+   */
+  private fun establishBlackhole() {
+    if (blackholeFd != null) return
+    try {
+      val b =
+          Builder()
+              .setSession(getString(com.victorious.mesh.R.string.app_name))
+              .setConfigureIntent(configIntent())
+              .setBlocking(true)
+              .allowFamily(OsConstants.AF_INET)
+              .addAddress("192.0.2.1", 32)
+              .addRoute("0.0.0.0", 0)
+              .addDnsServer("192.0.2.2")
+      try {
+        b.allowFamily(OsConstants.AF_INET6)
+        b.addAddress("2001:db8::1", 128)
+        b.addRoute("::", 0)
+      } catch (e: Exception) {
+        TSLog.w(TAG, "kill-switch blackhole IPv6 skipped: ${e.message}")
+      }
+      blackholeFd = b.establish()
+      TSLog.d(TAG, "kill-switch blackhole established")
+    } catch (e: Exception) {
+      TSLog.e(TAG, "kill-switch blackhole failed: ${e.message}")
+    }
+  }
+
+  private fun stopBlackhole() {
+    try {
+      blackholeFd?.close()
+    } catch (_: Exception) {}
+    blackholeFd = null
   }
 
   private fun updateUnderlyingNetwork(network: Network?) {

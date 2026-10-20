@@ -31,6 +31,7 @@ data class SettingsNav(
     val onNavigateToHelp: () -> Unit = {},
     val onNavigateToProxy: () -> Unit = {},
     val onNavigateToPerAppRouting: () -> Unit = {},
+    val onNavigateToKillSwitch: () -> Unit = {},
 )
 
 class SettingsViewModel : IpnViewModel() {

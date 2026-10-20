@@ -149,6 +149,17 @@ from this app, so it is not a true per-app vantage point for Direct apps.
 **Traffic:** not tracked (would need usage-access). No GPS spoofing. No new
 fleet operations.
 
+## Kill switch
+
+**Settings → Kill switch.** Off by default. **[not device-verified]**
+
+When the mesh or WireGuard has been started, an unexpected drop holds a
+blocking VPN (documentation-range dummy addresses) and reconnects.
+Turning the main switch or Quick Settings tile off is an explicit leave.
+Android Always-on VPN plus “Block connections without VPN” is the
+stronger system lock. Another app taking the VPN slot cannot be held.
+Direct apps still bypass. No new fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
