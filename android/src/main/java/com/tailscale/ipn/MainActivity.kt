@@ -70,6 +70,7 @@ import com.tailscale.ipn.ui.view.BugReportView
 import com.tailscale.ipn.ui.view.DNSSettingsView
 import com.tailscale.ipn.ui.view.ExitNodePicker
 import com.tailscale.ipn.ui.view.HealthView
+import com.tailscale.ipn.ui.view.HelpView
 import com.tailscale.ipn.ui.view.IntroView
 import com.tailscale.ipn.ui.view.LoginQRView
 import com.tailscale.ipn.ui.view.LoginWithAuthKeyView
@@ -335,6 +336,7 @@ class MainActivity : ComponentActivity() {
                         navController.navigate("search")
                       },
                       onNavigateToWireGuard = { navController.navigate("wireguard") },
+                      onNavigateToHelp = { navController.navigate("help") },
                   )
               val settingsNav =
                   SettingsNav(
@@ -352,6 +354,7 @@ class MainActivity : ComponentActivity() {
                       onNavigateToPermissions = { navController.navigate("permissions") },
                       onBackToSettings = backTo("settings"),
                       onNavigateBackHome = backTo("main"),
+                      onNavigateToHelp = { navController.navigate("help") },
                   )
               val exitNodePickerNav =
                   ExitNodePickerNav(
@@ -425,6 +428,7 @@ class MainActivity : ComponentActivity() {
               composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }
               composable("about") { AboutView(backTo("settings")) }
               composable("wireguard") { WireGuardView(backTo("settings")) }
+              composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(
                     onBack = backTo("settings"),

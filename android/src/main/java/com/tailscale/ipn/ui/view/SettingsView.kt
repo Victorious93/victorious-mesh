@@ -168,6 +168,9 @@ fun SettingsView(
         )
       }
 
+      Lists.ItemDivider()
+      Setting.Text(R.string.help_settings_row, onClick = settingsNav.onNavigateToHelp)
+
       // Victorious Mesh: bug reports go to Tailscale's log server; hidden.
       Lists.SectionDivider()
       Setting.Text(

@@ -418,4 +418,8 @@
     <string name="wireguard_active_banner_body">The mesh is off. Open WireGuard profiles to disconnect or switch back.</string>
     <string name="fleet_allow_controller">Allow fleet controller (droidcommand-AI)</string>
     <string name="fleet_allow_controller_subtitle">Lets the signed droidcommand-AI app check status and turn the mesh on or off</string>
+    <string name="help_title">Help</string>
+    <string name="help_settings_row">Help / Manual</string>
+    <string name="help_load_error">The user manual could not be loaded.</string>
+    <string name="help_screenshot_pending">Screenshot pending</string>
 </resources>
