@@ -231,7 +231,9 @@ class FleetProtocolTest {
   fun responsesCarryNoCredentialKeys() {
     for (op in FleetProtocol.OPERATIONS) {
       val raw =
-          if (op == FleetProtocol.OP_NODE_STATUS)
+          if (op == FleetProtocol.OP_NODE_STATUS ||
+              op == FleetProtocol.OP_CONFIG_EXPORT ||
+              op == FleetProtocol.OP_CONFIG_IMPORT)
               req(
                   op,
                   params =

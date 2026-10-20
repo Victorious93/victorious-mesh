@@ -15,6 +15,14 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- Fleet `config.export` / `config.import` (UNIFIED_BACKUP, droidcommand-AI
+  #236): standalone `BridgeRequest` ops (not `remote.command` actionRefs)
+  with v1.1 envelope fields in `parameters`. Advertised on `capabilities.get`
+  as `remoteAllowed: false`. Export returns one `UnifiedBackupEntry` for
+  `com.victorious.mesh` (control URL, tunnel mode, non-secret prefs, WireGuard
+  profile metadata). Secret names refuse with `invalid_parameters`. Import
+  supports `dryRun` and `conflictPolicy` skip / overwrite / merge-by-id;
+  non-dryRun needs on-phone Approve/Deny; never enables external control.
 - Fleet `node.status.get` (STATUS-TRAY): `NodeStatusSnapshot` with mesh / vpn /
   node_health. Advertised on `capabilities.get`. Same v1.1 envelope auth,
   replay, and expiry as remote control. Down services still answer `ok` with

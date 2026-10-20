@@ -55,6 +55,7 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 | `mesh.down` | Turns the mesh off. Via `remote.command` this is destructive and needs an on-phone tap. |
 | `mesh.ip.get` | This phone's mesh IPv4 / IPv6 |
 | `node.status.get` | Status-tray snapshot (canonical `BridgeRequest` + envelope fields in `parameters`). mesh / vpn / node_health. No keys or IPs. |
+| `config.export` / `config.import` | This app's non-secret settings snapshot / restore (standalone `BridgeRequest`). Import needs on-phone confirm; never enables remote control. |
 | `remote.command` / `macro.step` / `macro.run` | Envelope v1.1: dispatch a mesh action, or run steps (honour `onError`; `dryRun` validates only) |
 
 **External control is OFF by default.** To turn it on, open the app, go to **Settings**,

@@ -2,8 +2,9 @@
 
 Victorious Mesh can be controlled by the fleet controller app **droidcommand-AI**
 (`ai.droidcommand.app`). The controller can check the mesh status, read a
-status-tray snapshot (`node.status.get`), read this phone's mesh IP addresses,
-and turn the mesh on or off.
+status-tray snapshot (`node.status.get`), export or import this app's
+non-secret settings (`config.export` / `config.import`), read this phone's mesh
+IP addresses, and turn the mesh on or off.
 
 Transport is unchanged from v1.0. Protocol version is **major 1, minor 1**.
 Minor 1 adds the FROZEN remote-control envelope (`capabilities.get`,
@@ -74,7 +75,8 @@ mismatch is still `node_mismatch`.
 
 ## Legacy operations (`mesh.*`)
 
-Still accepted. `parameters` must be `{}`.
+Still accepted. `parameters` must be `{}` except for standalone ops that carry
+v1.1 envelope fields (`node.status.get`, `config.export`, `config.import`).
 
 | Operation | What it does | Result |
 |---|---|---|
@@ -84,6 +86,8 @@ Still accepted. `parameters` must be `{}`.
 | `mesh.down` | Turns the mesh off | `requested: "down"`. No-op if WireGuard mode is already active (the mesh is already down). Legacy `mesh.down` still runs immediately (backward compatible). The same action via `remote.command` is gated (see below). |
 | `mesh.ip.get` | This phone's mesh addresses | `ipv4`, `ipv6` (null if not connected) |
 | `node.status.get` | Status-tray snapshot for this node (canonical standalone read op) | `NodeStatusSnapshot` (see below). Envelope fields live in `parameters`. |
+| `config.export` | This app's settings snapshot (canonical standalone action) | One `UnifiedBackupEntry` for `com.victorious.mesh`. Envelope fields live in `parameters`. |
+| `config.import` | Restore settings from a bundle (canonical standalone action) | Dry-run returns the planned diff. A real import needs on-phone Approve/Deny and never enables external control. |
 
 ## Remote-control envelope v1.1
 
@@ -136,6 +140,8 @@ and is bounded (oldest entries evicted first).
 | `node.status.get` | `read` | true | false |
 | `mesh.up` | `action` | true | false |
 | `mesh.down` | `destructive` | true | true |
+| `config.export` | `action` | **false** | false |
+| `config.import` | `action` | **false** | **true** |
 
 `mesh.down` is destructive because it cuts the network for every fleet app on
 this phone.
@@ -195,6 +201,64 @@ compatibility — they are not `invalid_parameters`.
 **[not device-verified]** Snapshot contents on a real phone have not been
 checked.
 
+### `config.export` / `config.import` (unified backup)
+
+Frozen UNIFIED_BACKUP (`UNIFIED_BACKUP.md`, droidcommand-AI #236).
+**Canonical path** is a `BridgeRequest` with `operation: "config.export"` or
+`config.import` and the same v1.1 envelope fields in `parameters` as
+`node.status.get`. These are **not** `remote.command` actionRefs. A
+`remote.command` / macro that names them returns `capability_off`
+(`remoteAllowed: false`).
+
+`config.export` returns exactly one `UnifiedBackupEntry` for
+`com.victorious.mesh`:
+
+```json
+{
+  "packageName": "com.victorious.mesh",
+  "schemaVersion": 1,
+  "clearPayload": "{\"controlUrl\":\"https://hs.example.com\",\"tunnelMode\":\"MESH\",\"activeWireGuardProfileId\":null,\"prefs\":{\"corpDns\":true,\"wantRunning\":true,\"exitNodeAllowLanAccess\":false},\"wireGuardProfiles\":[{\"id\":\"…\",\"name\":\"office\"}]}"
+}
+```
+
+The clear payload is **this app's settings only**: control URL, tunnel mode,
+non-secret prefs (`corpDns`, `wantRunning`, `exitNodeAllowLanAccess`), and
+WireGuard **profile metadata** (`id`, `name`). This slice uses
+`wrapping=none` + `clearPayload` (Android Keystore wrap is out of scope).
+
+Export and import **refuse** (`invalid_parameters`) if the JSON contains
+secret names or obvious variants. They never silently strip. Never exported
+or imported: signing keys, Headscale/Tailscale auth or node keys, WireGuard
+private keys or preshared keys, API tokens, passwords.
+
+`config.import` args (inside `parameters` or `parameters.args`; unknown keys
+ignored):
+
+| Arg | Meaning |
+|---|---|
+| `bundle` | `UnifiedFleetBackup` JSON (string or object). Required. |
+| `dryRun` | `true` = validate and return the planned diff; do not write. |
+| `conflictPolicy` | `skip` (default) \| `overwrite` \| `merge-by-id` |
+
+`skip` keeps live rows and drops imported ids. `overwrite` replaces live
+rows (and adds missing WireGuard metadata). `merge-by-id` is a union: live
+ids win on collision; imported ids fill gaps. Scalars follow the same
+policy (`merge-by-id` takes the imported value only when the live value is
+empty). On-device apply never writes WireGuard private/preshared keys; a
+new profile id is metadata only and does not create a working tunnel.
+
+A non-dryRun import always returns `confirmation_required` and posts an
+Approve/Deny notification. Nothing auto-approves it. After a confirmed
+apply, `externalControlEnabled` is forced **false** even if the payload
+said `true` and the policy is `overwrite`. Import never enables
+`remote.command`.
+
+`dryRun` returns only the planned diff (`dryRun: true`, `wouldWrite: false`,
+`changes`, `externalControlEnabled: false`).
+
+**[not device-verified]** Export/import on a real phone have not been
+checked.
+
 ### WireGuard mode
 
 Unchanged: while a WireGuard profile is connected, `mesh.status` /
@@ -221,9 +285,9 @@ Remote envelope v1.1 uses:
 | `replay_detected` | This caller already used this nonce. |
 | `expired` | `now > timestampMs + ttlMs`, or `timestampMs` is more than 120 seconds in the future. |
 | `external_control_disabled` | The Settings switch is off (everything except `capabilities.get`). |
-| `confirmation_required` | Destructive action waiting for an on-phone Approve. |
+| `confirmation_required` | Destructive action or `config.import` waiting for an on-phone Approve. |
 | `unsupported_op` | `op` is not one of the four envelope operations. |
-| `capability_off` | `actionRef` is known but `remoteAllowed` is false. |
+| `capability_off` | `actionRef` is known but `remoteAllowed` is false (including `config.export` / `config.import`). |
 
 (`verify_failed` is part of the shared spec but is not produced by this node.)
 
