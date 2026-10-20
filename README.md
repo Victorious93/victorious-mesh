@@ -35,7 +35,8 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 
 - **Transport:** an Android Messenger bridge, intent action
   `com.victorious.mesh.action.BRIDGE`.
-- **Protocol:** the shared fleet JSON envelope, `protocol_major` 1.
+- **Protocol:** the shared fleet JSON envelope, `protocol_major` 1, `protocol_minor` 1
+  (remote-control envelope plus backward-compatible `mesh.*` ops).
 - **Pairing:** by package name + signing-certificate SHA-256, checked on this side.
   Mesh does **not** share a signing key with the controller.
 - **Allowlist:** `ai.droidcommand.app` and `ai.droidcommand.app.debug`, each pinned to
@@ -48,11 +49,12 @@ Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
 
 | Operation | What it does |
 |---|---|
-| `mesh.capabilities.get` | Lists supported operations (`dca_required: false`, `fleet_class: external_node`) |
+| `mesh.capabilities.get` / `capabilities.get` | Lists supported operations. Envelope form returns `{name, kind, remoteAllowed, requiresConfirm}` per op. Allowed even when the Settings switch is off. |
 | `mesh.status` | Connection state, control server URL, mesh IPs |
 | `mesh.up` | Turns the mesh on (refused until the user has opened the app once and approved the VPN) |
-| `mesh.down` | Turns the mesh off |
+| `mesh.down` | Turns the mesh off. Via `remote.command` this is destructive and needs an on-phone tap. |
 | `mesh.ip.get` | This phone's mesh IPv4 / IPv6 |
+| `remote.command` / `macro.step` / `macro.run` | Envelope v1.1: dispatch a mesh action, or run steps (honour `onError`; `dryRun` validates only) |
 
 **External control is OFF by default.** To turn it on, open the app, go to **Settings**,
 and switch on **Allow fleet controller (droidcommand-AI)**.

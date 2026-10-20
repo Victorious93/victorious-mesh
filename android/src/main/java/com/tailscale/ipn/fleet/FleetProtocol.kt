@@ -1,23 +1,29 @@
 // Victorious Mesh
 // Fleet IPC bridge: pure-Kotlin protocol core (no Android deps, JVM unit-testable).
-// Spec: EXTERNAL_NODE spec relayed by Fleet Orchestrator 2026-10-18.
+// Spec: EXTERNAL_NODE mesh.* ops (2026-10-18) + FROZEN remote-control envelope v1
+// (BRIDGE_PROTOCOL_MAJOR=1, MINOR=1).
 
 package com.tailscale.ipn.fleet
 
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.LinkedHashMap
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 object FleetProtocol {
   const val PROTOCOL_MAJOR = 1
+  const val PROTOCOL_MINOR = 1
   const val ACTION_BRIDGE = "com.victorious.mesh.action.BRIDGE"
   const val MSG_REQUEST = 1
   const val MSG_RESPONSE = 2
@@ -35,6 +41,30 @@ object FleetProtocol {
   const val OP_IP_GET = "mesh.ip.get"
   val OPERATIONS = listOf(OP_CAPABILITIES, OP_STATUS, OP_UP, OP_DOWN, OP_IP_GET)
 
+  const val OP_REMOTE_CAPABILITIES = "capabilities.get"
+  const val OP_REMOTE_COMMAND = "remote.command"
+  const val OP_MACRO_STEP = "macro.step"
+  const val OP_MACRO_RUN = "macro.run"
+
+  const val KIND_READ = "read"
+  const val KIND_ACTION = "action"
+  const val KIND_DESTRUCTIVE = "destructive"
+
+  const val ON_ERROR_ABORT = "abort"
+  const val ON_ERROR_CONTINUE = "continue"
+
+  const val DEFAULT_TTL_MS = 120_000L
+  const val MAX_TTL_MS = 300_000L
+  const val MAX_SKEW_MS = 120_000L
+  const val NONCE_RETAIN_MS = 10L * 60L * 1000L
+  const val NONCE_CACHE_MAX_ENTRIES = 4096
+
+  private val NONCE_HEX = Regex("^[0-9a-fA-F]{32}$")
+  private val NONCE_UUID =
+      Regex(
+          "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+      )
+
   val json = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
@@ -46,6 +76,22 @@ object FleetProtocol {
   }
 
   fun isValidNodeId(id: String) = NODE_ID_REGEX.matches(id)
+
+  fun isValidNonce(nonce: String) = NONCE_HEX.matches(nonce) || NONCE_UUID.matches(nonce)
+
+  fun normalizeNonce(nonce: String) = nonce.replace("-", "").lowercase()
+
+  /** ttlMs above MAX_TTL_MS is clamped; callers must already reject non-positive values. */
+  fun clampTtl(ttlMs: Long): Long = ttlMs.coerceAtMost(MAX_TTL_MS)
+
+  fun looksLikeRemoteEnvelope(raw: String?): Boolean {
+    return try {
+      val el = json.parseToJsonElement(raw ?: "")
+      el is JsonObject && "op" in el
+    } catch (_: Exception) {
+      false
+    }
+  }
 }
 
 object ErrorCategory {
@@ -59,6 +105,14 @@ object ErrorCategory {
   const val INTERNAL = "internal"
   const val EXTERNAL_CONTROL_DISABLED = "external_control_disabled"
   const val UNAUTHORIZED_CALLER = "unauthorized_caller"
+  const val NOT_PAIRED = "not_paired"
+  const val NOT_FOUND = "not_found"
+  const val UNAUTHORIZED = "unauthorized"
+  const val REPLAY_DETECTED = "replay_detected"
+  const val EXPIRED = "expired"
+  const val CONFIRMATION_REQUIRED = "confirmation_required"
+  const val UNSUPPORTED_OP = "unsupported_op"
+  const val CAPABILITY_OFF = "capability_off"
 }
 
 @Serializable
@@ -71,14 +125,43 @@ data class BridgeRequest(
     val parameters: JsonObject = JsonObject(emptyMap()),
 )
 
-@Serializable data class BridgeError(val category: String, val message: String)
+@Serializable
+data class RemoteEnvelope(
+    @SerialName("protocol_major") val protocolMajor: Int = FleetProtocol.PROTOCOL_MAJOR,
+    @SerialName("protocol_minor") val protocolMinor: Int = FleetProtocol.PROTOCOL_MINOR,
+    val op: String,
+    val requestId: String,
+    val targetNodeRef: String,
+    val actionRef: String = "",
+    val params: JsonObject = JsonObject(emptyMap()),
+    val nonce: String,
+    val timestampMs: Long,
+    val ttlMs: Long? = null,
+    val destructive: Boolean = false,
+    val trigger: JsonObject = JsonObject(emptyMap()),
+    val macroId: String? = null,
+    val stepIndex: Int? = null,
+    val onError: String? = null,
+    val steps: List<MacroStep>? = null,
+    val dryRun: Boolean = false,
+)
 
 @Serializable
-data class BridgeProgress(val phase: String, val done: Int, val total: Int)
+data class MacroStep(
+    val actionRef: String,
+    val params: JsonObject = JsonObject(emptyMap()),
+    val onError: String = FleetProtocol.ON_ERROR_ABORT,
+    val destructive: Boolean = false,
+)
+
+@Serializable data class BridgeError(val category: String, val message: String)
+
+@Serializable data class BridgeProgress(val phase: String, val done: Int, val total: Int)
 
 @Serializable
 data class BridgeResponse(
     @SerialName("protocol_major") val protocolMajor: Int = FleetProtocol.PROTOCOL_MAJOR,
+    @SerialName("protocol_minor") val protocolMinor: Int = FleetProtocol.PROTOCOL_MINOR,
     @SerialName("request_id") val requestId: String? = null,
     @SerialName("node_id") val nodeId: String? = null,
     val ok: Boolean,
@@ -121,6 +204,138 @@ fun MeshStatus.forTunnelMode(wireGuardActive: Boolean): MeshStatus =
 
 class InvalidParametersException(msg: String) : Exception(msg)
 
+data class RemoteCapability(
+    val name: String,
+    val kind: String,
+    val remoteAllowed: Boolean,
+    val requiresConfirm: Boolean,
+) {
+  companion object {
+    val DEFAULTS: List<RemoteCapability> =
+        listOf(
+            RemoteCapability(FleetProtocol.OP_CAPABILITIES, FleetProtocol.KIND_READ, true, false),
+            RemoteCapability(FleetProtocol.OP_STATUS, FleetProtocol.KIND_READ, true, false),
+            RemoteCapability(FleetProtocol.OP_IP_GET, FleetProtocol.KIND_READ, true, false),
+            RemoteCapability(FleetProtocol.OP_UP, FleetProtocol.KIND_ACTION, true, false),
+            RemoteCapability(FleetProtocol.OP_DOWN, FleetProtocol.KIND_DESTRUCTIVE, true, true),
+        )
+  }
+}
+
+enum class RemoteOp {
+  CAPABILITIES_GET,
+  REMOTE_COMMAND,
+  MACRO_STEP,
+  MACRO_RUN,
+}
+
+fun parseRemoteOp(raw: String): RemoteOp? =
+    when (raw) {
+      FleetProtocol.OP_REMOTE_CAPABILITIES -> RemoteOp.CAPABILITIES_GET
+      FleetProtocol.OP_REMOTE_COMMAND -> RemoteOp.REMOTE_COMMAND
+      FleetProtocol.OP_MACRO_STEP -> RemoteOp.MACRO_STEP
+      FleetProtocol.OP_MACRO_RUN -> RemoteOp.MACRO_RUN
+      else -> null
+    }
+
+data class PendingConfirmation(
+    val id: String,
+    val actionRef: String,
+    val requestId: String,
+    val sourceNodeRef: String,
+    val expiresAtMs: Long,
+)
+
+fun interface ConfirmationSink {
+  fun onConfirmationRequired(pending: PendingConfirmation)
+}
+
+class ConfirmationRegistry(private val random: SecureRandom = SecureRandom()) {
+  private val pending = LinkedHashMap<String, PendingConfirmation>()
+
+  @Synchronized
+  fun create(
+      actionRef: String,
+      requestId: String,
+      sourceNodeRef: String,
+      expiresAtMs: Long,
+  ): PendingConfirmation {
+    val id = ByteArray(16).also { random.nextBytes(it) }.joinToString("") { "%02x".format(it) }
+    val p = PendingConfirmation(id, actionRef, requestId, sourceNodeRef, expiresAtMs)
+    pending[id] = p
+    return p
+  }
+
+  @Synchronized
+  fun peek(id: String): PendingConfirmation? = pending[id]
+
+  @Synchronized
+  fun take(id: String, nowMs: Long): PendingConfirmation? {
+    val p = pending.remove(id) ?: return null
+    if (nowMs > p.expiresAtMs) return null
+    return p
+  }
+
+  @Synchronized
+  fun takeExpiredOrMissing(id: String, nowMs: Long): Pair<PendingConfirmation?, Boolean> {
+    val p = pending[id] ?: return null to false
+    if (nowMs > p.expiresAtMs) {
+      pending.remove(id)
+      return null to true
+    }
+    pending.remove(id)
+    return p to false
+  }
+
+  @Synchronized fun deny(id: String) { pending.remove(id) }
+
+  @Synchronized fun size(): Int = pending.size
+}
+
+/**
+ * Replay cache keyed by (sourceNodeRef, nonce). Entries are kept at least [minRetainMs] and the
+ * map is bounded by [maxEntries] (oldest inserted keys evicted first after expiry sweep).
+ */
+class NonceCache(
+    private val minRetainMs: Long = FleetProtocol.NONCE_RETAIN_MS,
+    private val maxEntries: Int = FleetProtocol.NONCE_CACHE_MAX_ENTRIES,
+) {
+  private val map = LinkedHashMap<String, Long>()
+
+  @Synchronized
+  fun seen(sourceNodeRef: String, nonce: String, nowMs: Long): Boolean {
+    evict(nowMs)
+    val key = cacheKey(sourceNodeRef, nonce)
+    if (key in map) return true
+    map[key] = nowMs + minRetainMs
+    evict(nowMs)
+    return false
+  }
+
+  @Synchronized fun size(): Int = map.size
+
+  @Synchronized
+  fun contains(sourceNodeRef: String, nonce: String): Boolean = cacheKey(sourceNodeRef, nonce) in map
+
+  private fun evict(nowMs: Long) {
+    val it = map.entries.iterator()
+    while (it.hasNext()) {
+      if (it.next().value <= nowMs) it.remove()
+    }
+    while (map.size > maxEntries) {
+      val oldest = map.entries.iterator()
+      if (!oldest.hasNext()) break
+      oldest.next()
+      oldest.remove()
+    }
+  }
+
+  companion object {
+    fun cacheKey(sourceNodeRef: String, nonce: String) =
+        sourceNodeRef + "\u0000" + FleetProtocol.normalizeNonce(nonce)
+  }
+}
+
 /** Signing-cert allowlist for controller apps. */
 object CallerAllowlist {
   private const val DCA_DEBUG_CERT =
@@ -158,29 +373,81 @@ object CallerAllowlist {
 }
 
 /**
- * Dispatches a raw request string. Check order:
+ * Dispatches a raw request string.
+ *
+ * Authorization is ONLY the caller package + cert allowlist (see [callerAllowed] /
+ * [sourceNodeRef]). Envelope fields including trigger.* never grant access.
+ *
+ * Legacy mesh.* BridgeRequest check order (backward compatible):
  * 1. caller allowlist -> unauthorized_caller
- * 2. external control setting -> external_control_disabled
- * 3. JSON parse -> malformed_request
- * 4. protocol_major -> protocol_mismatch
- * 5. target_node_id -> node_mismatch
+ * 2. JSON parse -> malformed_request
+ * 3. protocol_major -> protocol_mismatch
+ * 4. target_node_id -> node_mismatch
+ * 5. external control (except mesh.capabilities.get) -> external_control_disabled
  * 6. operation -> unsupported_operation / invalid_parameters / safety_refused / internal
+ *
+ * Remote envelope v1.1 check order:
+ * 1. caller allowlist -> unauthorized
+ * 2. JSON parse / required fields -> invalid_parameters
+ * 3. targetNodeRef -> not_paired
+ * 4. ttl / nonce format -> invalid_parameters (ttl above max is clamped)
+ * 5. expiry / clock skew -> expired
+ * 6. duplicate (sourceNodeRef, nonce) -> replay_detected
+ * 7. external control (except capabilities.get) -> external_control_disabled
+ * 8. op / action / capability / confirmation / mesh action
  */
-class FleetDispatcher(private val nodeId: String, private val backend: MeshBackend) {
+class FleetDispatcher(
+    private val nodeId: String,
+    private val backend: MeshBackend,
+    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val nonceCache: NonceCache = NonceCache(),
+    private val confirmations: ConfirmationRegistry = ConfirmationRegistry(),
+    private val confirmationSink: ConfirmationSink = ConfirmationSink {},
+    private val capabilities: List<RemoteCapability> = RemoteCapability.DEFAULTS,
+) {
 
-  fun handle(raw: String?, callerAllowed: Boolean, controlEnabled: Boolean): BridgeResponse {
-    if (!callerAllowed)
-        return err(null, ErrorCategory.UNAUTHORIZED_CALLER, "caller is not an allowlisted controller", withNode = false)
-    if (!controlEnabled)
-        return err(
-            null,
-            ErrorCategory.EXTERNAL_CONTROL_DISABLED,
-            "external control is turned off in Victorious Mesh settings",
-        )
+  fun handle(
+      raw: String?,
+      callerAllowed: Boolean,
+      controlEnabled: Boolean,
+      sourceNodeRef: String = "",
+  ): BridgeResponse {
+    val src = sourceNodeRef.ifBlank { "unknown-caller" }
+    if (!callerAllowed) {
+      val cat =
+          if (FleetProtocol.looksLikeRemoteEnvelope(raw)) ErrorCategory.UNAUTHORIZED
+          else ErrorCategory.UNAUTHORIZED_CALLER
+      return err(null, cat, "caller is not an allowlisted controller", withNode = false)
+    }
+    if (FleetProtocol.looksLikeRemoteEnvelope(raw)) {
+      return handleEnvelope(raw, controlEnabled, src)
+    }
+    return handleLegacy(raw, controlEnabled)
+  }
+
+  fun confirmAndExecute(pendingId: String): BridgeResponse {
+    val now = clock()
+    val (pending, expired) = confirmations.takeExpiredOrMissing(pendingId, now)
+    if (expired) return err(null, ErrorCategory.EXPIRED, "pending confirmation expired")
+    if (pending == null) return err(null, ErrorCategory.NOT_FOUND, "no pending confirmation")
+    return try {
+      ok(pending.requestId, runMeshAction(pending.actionRef))
+    } catch (e: InvalidParametersException) {
+      err(pending.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: SafetyRefused) {
+      err(pending.requestId, ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
+    } catch (e: Exception) {
+      err(pending.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  fun denyConfirmation(pendingId: String) = confirmations.deny(pendingId)
+
+  private fun handleLegacy(raw: String?, controlEnabled: Boolean): BridgeResponse {
     val req =
         try {
           FleetProtocol.json.decodeFromString(BridgeRequest.serializer(), raw ?: "")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
           return err(null, ErrorCategory.MALFORMED_REQUEST, "request is not a valid BridgeRequest")
         }
     if (req.protocolMajor != FleetProtocol.PROTOCOL_MAJOR)
@@ -191,26 +458,273 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
         )
     if (req.targetNodeId != nodeId)
         return err(req.requestId, ErrorCategory.NODE_MISMATCH, "target_node_id does not match this node")
+    if (!controlEnabled && req.operation != FleetProtocol.OP_CAPABILITIES)
+        return err(
+            req.requestId,
+            ErrorCategory.EXTERNAL_CONTROL_DISABLED,
+            "external control is turned off in Victorious Mesh settings",
+        )
     return try {
       if (req.operation !in FleetProtocol.OPERATIONS)
           return err(req.requestId, ErrorCategory.UNSUPPORTED_OPERATION, "unsupported operation")
       if (req.parameters.isNotEmpty())
           throw InvalidParametersException("operation ${req.operation} takes no parameters")
       if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
-      ok(req.requestId, run(req.operation))
+      ok(req.requestId, runMeshAction(req.operation))
     } catch (e: InvalidParametersException) {
       err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
     } catch (e: SafetyRefused) {
       err(req.requestId, ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
     } catch (e: Exception) {
-      // Do not leak exception details (could contain paths/state); class name only.
       err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
     }
   }
 
+  private fun handleEnvelope(
+      raw: String?,
+      controlEnabled: Boolean,
+      sourceNodeRef: String,
+  ): BridgeResponse {
+    val env =
+        try {
+          FleetProtocol.json.decodeFromString(RemoteEnvelope.serializer(), raw ?: "")
+        } catch (_: Exception) {
+          return err(null, ErrorCategory.INVALID_PARAMETERS, "request is not a valid remote envelope")
+        }
+    if (env.protocolMajor != FleetProtocol.PROTOCOL_MAJOR)
+        return err(
+            env.requestId,
+            ErrorCategory.INVALID_PARAMETERS,
+            "unsupported protocol_major ${env.protocolMajor}; expected ${FleetProtocol.PROTOCOL_MAJOR}",
+        )
+    if (env.requestId.isBlank())
+        return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "requestId must be non-empty")
+    if (env.targetNodeRef.isBlank())
+        return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "targetNodeRef must be non-empty")
+    if (env.targetNodeRef != nodeId)
+        return err(env.requestId, ErrorCategory.NOT_PAIRED, "targetNodeRef does not match this node")
+    if (!FleetProtocol.isValidNonce(env.nonce))
+        return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, "nonce must be a 128-bit hex or UUID")
+    val ttl =
+        try {
+          resolveTtl(raw, env)
+        } catch (e: InvalidParametersException) {
+          return err(env.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid ttlMs")
+        }
+    val now = clock()
+    if (isExpired(env.timestampMs, ttl, now))
+        return err(env.requestId, ErrorCategory.EXPIRED, "envelope expired")
+    if (nonceCache.seen(sourceNodeRef, env.nonce, now))
+        return err(env.requestId, ErrorCategory.REPLAY_DETECTED, "nonce has already been used")
+    val remoteOp = parseRemoteOp(env.op)
+    if (remoteOp == null)
+        return err(env.requestId, ErrorCategory.UNSUPPORTED_OP, "unsupported op")
+    if (!controlEnabled && remoteOp != RemoteOp.CAPABILITIES_GET)
+        return err(
+            env.requestId,
+            ErrorCategory.EXTERNAL_CONTROL_DISABLED,
+            "external control is turned off in Victorious Mesh settings",
+        )
+    return try {
+      when (remoteOp) {
+        RemoteOp.CAPABILITIES_GET -> ok(env.requestId, capabilitiesResult())
+        RemoteOp.REMOTE_COMMAND -> dispatchRemoteCommand(env, sourceNodeRef, ttl, now)
+        RemoteOp.MACRO_STEP -> dispatchMacroStep(env, sourceNodeRef, ttl, now)
+        RemoteOp.MACRO_RUN -> dispatchMacroRun(env, sourceNodeRef, ttl, now)
+      }
+    } catch (e: InvalidParametersException) {
+      err(env.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: SafetyRefused) {
+      err(env.requestId, ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
+    } catch (e: Exception) {
+      err(env.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  private fun dispatchRemoteCommand(
+      env: RemoteEnvelope,
+      sourceNodeRef: String,
+      ttl: Long,
+      now: Long,
+  ): BridgeResponse {
+    if (env.actionRef.isBlank())
+        throw InvalidParametersException("actionRef must be non-empty")
+    if (env.params.isNotEmpty())
+        throw InvalidParametersException("operation ${env.actionRef} takes no parameters")
+    return outcomeToResponse(env.requestId, executeAction(env.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = true))
+  }
+
+  private fun dispatchMacroStep(
+      env: RemoteEnvelope,
+      sourceNodeRef: String,
+      ttl: Long,
+      now: Long,
+  ): BridgeResponse {
+    val macroId = env.macroId?.takeIf { it.isNotBlank() }
+        ?: throw InvalidParametersException("macroId must be non-empty")
+    val stepIndex = env.stepIndex
+        ?: throw InvalidParametersException("stepIndex is required")
+    if (stepIndex < 0) throw InvalidParametersException("stepIndex must be >= 0")
+    val onError = env.onError ?: FleetProtocol.ON_ERROR_ABORT
+    if (onError != FleetProtocol.ON_ERROR_ABORT && onError != FleetProtocol.ON_ERROR_CONTINUE)
+        throw InvalidParametersException("onError must be abort or continue")
+    if (env.actionRef.isBlank()) throw InvalidParametersException("actionRef must be non-empty")
+    if (env.params.isNotEmpty())
+        throw InvalidParametersException("operation ${env.actionRef} takes no parameters")
+    val outcome = executeAction(env.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = true)
+    val result =
+        buildJsonObject {
+          put("macroId", macroId)
+          put("stepIndex", stepIndex)
+          put("onError", onError)
+          put("actionRef", env.actionRef)
+          putOutcome(outcome)
+        }
+    return when (outcome) {
+      is ActionOutcome.Ok -> ok(env.requestId, result)
+      is ActionOutcome.Err ->
+          BridgeResponse(
+              requestId = env.requestId,
+              nodeId = nodeId,
+              ok = false,
+              result = result,
+              error = BridgeError(outcome.category, outcome.message),
+          )
+    }
+  }
+
+  private fun dispatchMacroRun(
+      env: RemoteEnvelope,
+      sourceNodeRef: String,
+      ttl: Long,
+      now: Long,
+  ): BridgeResponse {
+    val macroId = env.macroId?.takeIf { it.isNotBlank() }
+        ?: throw InvalidParametersException("macroId must be non-empty")
+    val steps = env.steps ?: throw InvalidParametersException("steps is required")
+    val execute = !env.dryRun
+    val stepResults = ArrayList<JsonObject>(steps.size)
+    var firstError: ActionOutcome.Err? = null
+    var aborted = false
+    for ((index, step) in steps.withIndex()) {
+      if (step.actionRef.isBlank()) throw InvalidParametersException("steps[$index].actionRef must be non-empty")
+      if (step.params.isNotEmpty())
+          throw InvalidParametersException("operation ${step.actionRef} takes no parameters")
+      if (step.onError != FleetProtocol.ON_ERROR_ABORT && step.onError != FleetProtocol.ON_ERROR_CONTINUE)
+          throw InvalidParametersException("steps[$index].onError must be abort or continue")
+      val outcome =
+          executeAction(step.actionRef, env.requestId, sourceNodeRef, ttl, now, execute = execute)
+      stepResults.add(
+          buildJsonObject {
+            put("stepIndex", index)
+            put("actionRef", step.actionRef)
+            put("onError", step.onError)
+            putOutcome(outcome)
+          }
+      )
+      if (outcome is ActionOutcome.Err) {
+        if (firstError == null) firstError = outcome
+        if (step.onError == FleetProtocol.ON_ERROR_ABORT) {
+          aborted = true
+          break
+        }
+      }
+    }
+    val result =
+        buildJsonObject {
+          put("macroId", macroId)
+          put("dryRun", env.dryRun)
+          put("aborted", aborted)
+          putJsonArray("steps") { stepResults.forEach { add(it) } }
+        }
+    val err = firstError
+    return if (err == null) ok(env.requestId, result)
+    else
+        BridgeResponse(
+            requestId = env.requestId,
+            nodeId = nodeId,
+            ok = false,
+            result = result,
+            error = BridgeError(err.category, err.message),
+        )
+  }
+
+  private fun executeAction(
+      actionRef: String,
+      requestId: String,
+      sourceNodeRef: String,
+      ttl: Long,
+      now: Long,
+      execute: Boolean,
+  ): ActionOutcome {
+    val cap = capabilities.find { it.name == actionRef }
+    if (cap == null) return ActionOutcome.Err(ErrorCategory.NOT_FOUND, "unknown actionRef $actionRef")
+    if (!cap.remoteAllowed)
+        return ActionOutcome.Err(ErrorCategory.CAPABILITY_OFF, "action $actionRef is not remotely allowed")
+    if (cap.kind == FleetProtocol.KIND_DESTRUCTIVE || cap.requiresConfirm) {
+      if (!execute) {
+        return ActionOutcome.Ok(
+            buildJsonObject {
+              put("validated", true)
+              put("confirmationRequired", true)
+              put("actionRef", actionRef)
+            }
+        )
+      }
+      val pending =
+          confirmations.create(
+              actionRef = actionRef,
+              requestId = requestId,
+              sourceNodeRef = sourceNodeRef,
+              expiresAtMs = now + ttl,
+          )
+      confirmationSink.onConfirmationRequired(pending)
+      return ActionOutcome.Err(
+          ErrorCategory.CONFIRMATION_REQUIRED,
+          "destructive action requires on-phone confirmation",
+      )
+    }
+    if (!execute) {
+      return ActionOutcome.Ok(buildJsonObject { put("validated", true); put("actionRef", actionRef) })
+    }
+    return try {
+      ActionOutcome.Ok(runMeshAction(actionRef))
+    } catch (e: InvalidParametersException) {
+      ActionOutcome.Err(ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: SafetyRefused) {
+      ActionOutcome.Err(ErrorCategory.SAFETY_REFUSED, e.message ?: "refused")
+    } catch (e: Exception) {
+      ActionOutcome.Err(ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  private fun outcomeToResponse(requestId: String, outcome: ActionOutcome): BridgeResponse =
+      when (outcome) {
+        is ActionOutcome.Ok -> ok(requestId, outcome.result)
+        is ActionOutcome.Err -> err(requestId, outcome.category, outcome.message)
+      }
+
+  private fun capabilitiesResult(): JsonObject =
+      buildJsonObject {
+        putJsonArray("operations") {
+          capabilities.forEach { cap ->
+            add(
+                buildJsonObject {
+                  put("name", cap.name)
+                  put("kind", cap.kind)
+                  put("remoteAllowed", cap.remoteAllowed)
+                  put("requiresConfirm", cap.requiresConfirm)
+                }
+            )
+          }
+        }
+        put("protocol_major", FleetProtocol.PROTOCOL_MAJOR)
+        put("protocol_minor", FleetProtocol.PROTOCOL_MINOR)
+      }
+
   private class SafetyRefused(msg: String) : Exception(msg)
 
-  private fun run(op: String): JsonObject =
+  private fun runMeshAction(op: String): JsonObject =
       when (op) {
         FleetProtocol.OP_CAPABILITIES ->
             buildJsonObject {
@@ -218,6 +732,7 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
               put("dca_required", false)
               put("fleet_class", "external_node")
               put("protocol_major", FleetProtocol.PROTOCOL_MAJOR)
+              put("protocol_minor", FleetProtocol.PROTOCOL_MINOR)
             }
         FleetProtocol.OP_STATUS -> {
           val s = backend.status().forTunnelMode(backend.wireGuardModeActive())
@@ -255,7 +770,7 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
             put("ipv6", s.ipv6)
           }
         }
-        else -> throw IllegalStateException("unreachable")
+        else -> throw InvalidParametersException("unsupported mesh action $op")
       }
 
   private fun ok(id: String?, result: JsonObject) =
@@ -275,5 +790,60 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
       val ips = prefixes.orEmpty().map { it.substringBefore('/') }
       return ips.firstOrNull { !it.contains(':') } to ips.firstOrNull { it.contains(':') }
     }
+
+    fun isExpired(timestampMs: Long, ttlMs: Long, nowMs: Long): Boolean {
+      if (nowMs > timestampMs + ttlMs) return true
+      val skew = nowMs - timestampMs
+      return kotlin.math.abs(skew) > FleetProtocol.MAX_SKEW_MS
+    }
+
+    private fun resolveTtl(raw: String?, env: RemoteEnvelope): Long {
+      val explicit = peekTtlElement(raw)
+      if (explicit != null) {
+        val n = explicit.longOrNull ?: throw InvalidParametersException("ttlMs must be an integer")
+        if (n <= 0) throw InvalidParametersException("ttlMs must be positive")
+        return FleetProtocol.clampTtl(n)
+      }
+      val n = env.ttlMs ?: return FleetProtocol.DEFAULT_TTL_MS
+      if (n <= 0) throw InvalidParametersException("ttlMs must be positive")
+      return FleetProtocol.clampTtl(n)
+    }
+
+    private fun peekTtlElement(raw: String?): JsonPrimitive? {
+      val el =
+          try {
+            FleetProtocol.json.parseToJsonElement(raw ?: "")
+          } catch (_: Exception) {
+            return null
+          }
+      if (el !is JsonObject) return null
+      val ttl: JsonElement = el["ttlMs"] ?: return null
+      return ttl as? JsonPrimitive
+    }
+
+    private fun JsonObjectBuilder.putOutcome(outcome: ActionOutcome) {
+      when (outcome) {
+        is ActionOutcome.Ok -> {
+          put("ok", true)
+          put("result", outcome.result)
+        }
+        is ActionOutcome.Err -> {
+          put("ok", false)
+          put(
+              "error",
+              buildJsonObject {
+                put("category", outcome.category)
+                put("message", outcome.message)
+              },
+          )
+        }
+      }
+    }
   }
+}
+
+private sealed class ActionOutcome {
+  data class Ok(val result: JsonObject) : ActionOutcome()
+
+  data class Err(val category: String, val message: String) : ActionOutcome()
 }

@@ -68,6 +68,7 @@ class FleetProtocolTest {
             BridgeResponse(requestId = "dca-1", nodeId = node, ok = false, error = BridgeError("internal", "x")),
         )
     assertTrue(s.contains("\"protocol_major\":1"))
+    assertTrue(s.contains("\"protocol_minor\":1"))
     assertTrue(s.contains("\"request_id\":\"dca-1\""))
     assertTrue(s.contains("\"node_id\":\"$node\""))
     assertTrue(s.contains("\"category\":\"internal\""))
@@ -116,6 +117,14 @@ class FleetProtocolTest {
     assertEquals(FleetProtocol.OPERATIONS, res["operations"]!!.jsonArray.map { it.jsonPrimitive.content })
     assertFalse(res["dca_required"]!!.jsonPrimitive.boolean)
     assertEquals("external_node", res["fleet_class"]!!.jsonPrimitive.content)
+    assertEquals(1, res["protocol_minor"]!!.jsonPrimitive.content.toInt())
+  }
+
+  @Test
+  fun capabilitiesAllowedWhenControlDisabled() {
+    val r = call(req("mesh.capabilities.get"), enabled = false)
+    assertTrue(r.ok)
+    assertEquals(FleetProtocol.OPERATIONS, r.result!!["operations"]!!.jsonArray.map { it.jsonPrimitive.content })
   }
 
   @Test

@@ -417,7 +417,14 @@
     <string name="wireguard_active_banner_title">WireGuard is connected</string>
     <string name="wireguard_active_banner_body">The mesh is off. Open WireGuard profiles to disconnect or switch back.</string>
     <string name="fleet_allow_controller">Allow fleet controller (droidcommand-AI)</string>
-    <string name="fleet_allow_controller_subtitle">Lets the signed droidcommand-AI app check status and turn the mesh on or off</string>
+    <string name="fleet_allow_controller_subtitle">Lets the signed droidcommand-AI app check status and turn the mesh on or off. Turning the mesh off remotely needs a tap on this phone.</string>
+    <string name="fleet_confirm_channel">Fleet confirmation</string>
+    <string name="fleet_confirm_channel_desc">Asks you to approve destructive fleet actions on this phone</string>
+    <string name="fleet_confirm_title">Approve fleet action?</string>
+    <string name="fleet_confirm_down">The fleet controller wants to turn the mesh off. This cuts the network for every fleet app on this phone.</string>
+    <string name="fleet_confirm_generic">The fleet controller wants to run %1$s. Approve it on this phone.</string>
+    <string name="fleet_confirm_approve">Approve</string>
+    <string name="fleet_confirm_deny">Deny</string>
     <string name="help_title">Help</string>
     <string name="help_settings_row">Help / Manual</string>
     <string name="help_load_error">The user manual could not be loaded.</string>

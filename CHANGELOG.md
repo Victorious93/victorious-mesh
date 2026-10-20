@@ -11,3 +11,7 @@
   from the VPN routes on Android 13+.
 - Fleet bridge: `mesh.status` / `mesh.ip.get` report the mesh down while WireGuard mode
   is active, and `mesh.up` is refused in that state. No new operations.
+- Fleet bridge remote-control envelope v1.1 (`BRIDGE_PROTOCOL_MAJOR=1`, `MINOR=1`):
+  `capabilities.get`, `remote.command`, `macro.step`, `macro.run` on the existing
+  Messenger transport. Replay/expiry/nonce cache, destructive `mesh.down` confirmation
+  on the phone, and `trigger.*` never authorizes. Legacy `mesh.*` ops stay compatible.
