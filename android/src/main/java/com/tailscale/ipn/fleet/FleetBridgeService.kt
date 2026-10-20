@@ -28,9 +28,11 @@ import com.tailscale.ipn.App
 import com.tailscale.ipn.MainActivity
 import com.victorious.mesh.R
 import com.tailscale.ipn.UninitializedApp
+import com.tailscale.ipn.ui.localapi.Client
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
+import com.tailscale.ipn.wireguard.TunnelMode
 import com.tailscale.ipn.wireguard.WireGuardManager
 
 /** Persistent fleet settings: node id + external-control toggle (default OFF). */
@@ -73,6 +75,7 @@ object FleetRuntime {
           nonceCache = nonceCache,
           confirmations = confirmations,
           confirmationSink = FleetConfirmationNotifier(ctx.applicationContext),
+          configStore = AppConfigStore(ctx.applicationContext),
       )
 
   fun confirmAndExecute(ctx: Context, pendingId: String): BridgeResponse =
@@ -104,6 +107,71 @@ class AppMeshBackend(private val ctx: Context) : MeshBackend {
   override fun up() = UninitializedApp.get().startVPN()
 
   override fun down() = UninitializedApp.get().stopVPN()
+}
+
+/**
+ * Live settings for config.export / config.import. Reads control URL, non-secret
+ * prefs, tunnel mode, and WireGuard *metadata* only. Never reads or writes
+ * signing keys, node keys, or WireGuard private/preshared keys.
+ */
+class AppConfigStore(private val ctx: Context) : ConfigStore {
+  override fun snapshot(): MeshSettingsPayload {
+    val prefs = Notifier.prefs.value
+    val store = WireGuardManager.store(ctx)
+    return MeshSettingsPayload(
+        controlUrl = prefs?.ControlURL?.takeIf { it.isNotEmpty() },
+        tunnelMode = store.mode().name,
+        activeWireGuardProfileId = store.activeProfileId(),
+        prefs =
+            MeshNonSecretPrefs(
+                corpDns = prefs?.CorpDNS,
+                wantRunning = prefs?.WantRunning,
+                exitNodeAllowLanAccess = prefs?.ExitNodeAllowLANAccess,
+            ),
+        wireGuardProfiles = store.list().map { WireGuardProfileMeta(it.id, it.name) },
+    )
+  }
+
+  override fun apply(payload: MeshSettingsPayload) {
+    val store = WireGuardManager.store(ctx)
+    payload.tunnelMode?.let { name ->
+      runCatching { TunnelMode.valueOf(name) }.getOrNull()?.let { mode ->
+        val active = payload.activeWireGuardProfileId?.takeIf { it.isNotBlank() }
+        store.setMode(mode, if (mode == TunnelMode.WIREGUARD) active else null)
+      }
+    }
+    val liveIds = store.list().map { it.id }.toSet()
+    for (profile in payload.wireGuardProfiles) {
+      if (profile.id in liveIds) store.rename(profile.id, profile.name)
+    }
+    val masked = Ipn.MaskedPrefs()
+    var any = false
+    payload.controlUrl?.takeIf { it.isNotBlank() }?.let {
+      masked.ControlURL = it
+      any = true
+    }
+    payload.prefs?.corpDns?.let {
+      masked.CorpDNS = it
+      any = true
+    }
+    payload.prefs?.wantRunning?.let {
+      masked.WantRunning = it
+      any = true
+    }
+    payload.prefs?.exitNodeAllowLanAccess?.let {
+      masked.ExitNodeAllowLANAccess = it
+      any = true
+    }
+    if (any) {
+      Client(App.get().applicationScope).editPrefs(masked) {}
+    }
+  }
+
+  override fun isExternalControlEnabled(): Boolean = FleetSettings.isExternalControlEnabled(ctx)
+
+  override fun setExternalControlEnabled(enabled: Boolean) {
+    FleetSettings.setExternalControlEnabled(ctx, enabled)
+  }
 }
 
 class FleetBridgeService : Service() {
@@ -214,10 +282,10 @@ class FleetConfirmationNotifier(private val ctx: Context) : ConfirmationSink {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     val body =
-        if (pending.actionRef == FleetProtocol.OP_DOWN) {
-          ctx.getString(R.string.fleet_confirm_down)
-        } else {
-          ctx.getString(R.string.fleet_confirm_generic, pending.actionRef)
+        when (pending.actionRef) {
+          FleetProtocol.OP_DOWN -> ctx.getString(R.string.fleet_confirm_down)
+          FleetProtocol.OP_CONFIG_IMPORT -> ctx.getString(R.string.fleet_confirm_import)
+          else -> ctx.getString(R.string.fleet_confirm_generic, pending.actionRef)
         }
     val notification =
         NotificationCompat.Builder(ctx, CHANNEL_ID)

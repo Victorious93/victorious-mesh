@@ -140,20 +140,22 @@ class FleetEnvelopeTest {
     assertTrue(r.ok)
     assertEquals(1, r.protocolMinor)
     val ops = r.result!!["operations"]!!.jsonArray
-    assertEquals(6, ops.size)
+    assertEquals(8, ops.size)
     val byName = ops.associate { it.jsonObject["name"]!!.jsonPrimitive.content to it.jsonObject }
-    fun cap(name: String, kind: String, confirm: Boolean) {
+    fun cap(name: String, kind: String, remote: Boolean, confirm: Boolean) {
       val o = byName.getValue(name)
       assertEquals(kind, o["kind"]!!.jsonPrimitive.content)
-      assertTrue(o["remoteAllowed"]!!.jsonPrimitive.boolean)
+      assertEquals(remote, o["remoteAllowed"]!!.jsonPrimitive.boolean)
       assertEquals(confirm, o["requiresConfirm"]!!.jsonPrimitive.boolean)
     }
-    cap("mesh.capabilities.get", "read", false)
-    cap("mesh.status", "read", false)
-    cap("mesh.ip.get", "read", false)
-    cap("node.status.get", "read", false)
-    cap("mesh.up", "action", false)
-    cap("mesh.down", "destructive", true)
+    cap("mesh.capabilities.get", "read", true, false)
+    cap("mesh.status", "read", true, false)
+    cap("mesh.ip.get", "read", true, false)
+    cap("node.status.get", "read", true, false)
+    cap("mesh.up", "action", true, false)
+    cap("mesh.down", "destructive", true, true)
+    cap("config.export", "action", false, false)
+    cap("config.import", "action", false, true)
     assertEquals(1, r.result!!["protocol_minor"]!!.jsonPrimitive.content.toInt())
   }
 

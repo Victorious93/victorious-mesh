@@ -1,7 +1,8 @@
 // Victorious Mesh
 // Fleet IPC bridge: pure-Kotlin protocol core (no Android deps, JVM unit-testable).
 // Spec: EXTERNAL_NODE mesh.* ops (2026-10-18) + FROZEN remote-control envelope v1
-// (BRIDGE_PROTOCOL_MAJOR=1, MINOR=1) + STATUS-TRAY node.status.get (droidcommand-AI #235).
+// (BRIDGE_PROTOCOL_MAJOR=1, MINOR=1) + STATUS-TRAY node.status.get (droidcommand-AI #235)
+// + UNIFIED_BACKUP config.export / config.import (droidcommand-AI #236).
 
 package com.tailscale.ipn.fleet
 
@@ -44,7 +45,19 @@ object FleetProtocol {
   const val OP_DOWN = "mesh.down"
   const val OP_IP_GET = "mesh.ip.get"
   const val OP_NODE_STATUS = "node.status.get"
-  val OPERATIONS = listOf(OP_CAPABILITIES, OP_STATUS, OP_UP, OP_DOWN, OP_IP_GET, OP_NODE_STATUS)
+  const val OP_CONFIG_EXPORT = "config.export"
+  const val OP_CONFIG_IMPORT = "config.import"
+  val OPERATIONS =
+      listOf(
+          OP_CAPABILITIES,
+          OP_STATUS,
+          OP_UP,
+          OP_DOWN,
+          OP_IP_GET,
+          OP_NODE_STATUS,
+          OP_CONFIG_EXPORT,
+          OP_CONFIG_IMPORT,
+      )
 
   const val OP_REMOTE_CAPABILITIES = "capabilities.get"
   const val OP_REMOTE_COMMAND = "remote.command"
@@ -210,6 +223,8 @@ fun MeshStatus.forTunnelMode(wireGuardActive: Boolean): MeshStatus =
 
 class InvalidParametersException(msg: String) : Exception(msg)
 
+class ActionNotFound(msg: String) : Exception(msg)
+
 data class RemoteCapability(
     val name: String,
     val kind: String,
@@ -225,6 +240,8 @@ data class RemoteCapability(
             RemoteCapability(FleetProtocol.OP_NODE_STATUS, FleetProtocol.KIND_READ, true, false),
             RemoteCapability(FleetProtocol.OP_UP, FleetProtocol.KIND_ACTION, true, false),
             RemoteCapability(FleetProtocol.OP_DOWN, FleetProtocol.KIND_DESTRUCTIVE, true, true),
+            RemoteCapability(FleetProtocol.OP_CONFIG_EXPORT, FleetProtocol.KIND_ACTION, false, false),
+            RemoteCapability(FleetProtocol.OP_CONFIG_IMPORT, FleetProtocol.KIND_ACTION, false, true),
         )
   }
 }
@@ -251,6 +268,8 @@ data class PendingConfirmation(
     val requestId: String,
     val sourceNodeRef: String,
     val expiresAtMs: Long,
+    val importPayloadJson: String? = null,
+    val importResult: JsonObject? = null,
 )
 
 fun interface ConfirmationSink {
@@ -266,9 +285,20 @@ class ConfirmationRegistry(private val random: SecureRandom = SecureRandom()) {
       requestId: String,
       sourceNodeRef: String,
       expiresAtMs: Long,
+      importPayloadJson: String? = null,
+      importResult: JsonObject? = null,
   ): PendingConfirmation {
     val id = ByteArray(16).also { random.nextBytes(it) }.joinToString("") { "%02x".format(it) }
-    val p = PendingConfirmation(id, actionRef, requestId, sourceNodeRef, expiresAtMs)
+    val p =
+        PendingConfirmation(
+            id,
+            actionRef,
+            requestId,
+            sourceNodeRef,
+            expiresAtMs,
+            importPayloadJson,
+            importResult,
+        )
     pending[id] = p
     return p
   }
@@ -390,9 +420,10 @@ object CallerAllowlist {
  * 2. JSON parse -> malformed_request
  * 3. protocol_major -> protocol_mismatch
  * 4. target_node_id -> node_mismatch
- * 5. node.status.get is a standalone read op (see handleNodeStatus): envelope
- *    fields live in parameters; same replay/expiry; no confirmation.
- *    External control matches other read ops (mesh.status), not remote.command.
+ * 5. node.status.get / config.export / config.import are standalone BridgeRequest
+ *    ops (not remote.command actionRefs): envelope fields live in parameters;
+ *    same replay/expiry. config.import (non-dryRun) needs on-phone confirm.
+ *    External control matches other fleet ops (mesh.status).
  * 6. external control (except mesh.capabilities.get) -> external_control_disabled
  * 7. operation -> unsupported_operation / invalid_parameters / safety_refused / internal
  *
@@ -427,6 +458,7 @@ class FleetDispatcher(
     private val knownNodeRefs: Set<String>? = null,
     private val pairing: NodePairing = NodePairing { _, target -> target == nodeId },
     private val packageName: String = NodeStatusSnapshot.PACKAGE_VICTORIOUS_MESH,
+    private val configStore: ConfigStore = MemoryConfigStore(),
 ) {
 
   fun handle(
@@ -454,7 +486,11 @@ class FleetDispatcher(
     if (expired) return err(null, ErrorCategory.EXPIRED, "pending confirmation expired")
     if (pending == null) return err(null, ErrorCategory.NOT_FOUND, "no pending confirmation")
     return try {
-      ok(pending.requestId, runMeshAction(pending.actionRef))
+      if (pending.actionRef == FleetProtocol.OP_CONFIG_IMPORT) {
+        ok(pending.requestId, applyPendingImport(pending))
+      } else {
+        ok(pending.requestId, runMeshAction(pending.actionRef))
+      }
     } catch (e: InvalidParametersException) {
       err(pending.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
     } catch (e: SafetyRefused) {
@@ -487,6 +523,10 @@ class FleetDispatcher(
         return err(req.requestId, ErrorCategory.NODE_MISMATCH, "target_node_id does not match this node")
     if (req.operation == FleetProtocol.OP_NODE_STATUS)
         return handleNodeStatus(req, controlEnabled, sourceNodeRef)
+    if (req.operation == FleetProtocol.OP_CONFIG_EXPORT)
+        return handleConfigExport(req, controlEnabled, sourceNodeRef)
+    if (req.operation == FleetProtocol.OP_CONFIG_IMPORT)
+        return handleConfigImport(req, controlEnabled, sourceNodeRef)
     if (!controlEnabled && req.operation != FleetProtocol.OP_CAPABILITIES)
         return err(
             req.requestId,
@@ -522,6 +562,72 @@ class FleetDispatcher(
       controlEnabled: Boolean,
       sourceNodeRef: String,
   ): BridgeResponse {
+    consumeStandaloneEnvelope(req, controlEnabled, sourceNodeRef)?.let { return it }
+    return try {
+      if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
+      ok(req.requestId, nodeStatusResult(req.parameters))
+    } catch (e: InvalidParametersException) {
+      err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
+    } catch (e: Exception) {
+      err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  /**
+   * Canonical `config.export`: one UnifiedBackupEntry for this app. Never
+   * secrets. Not an actionRef under remote.command.
+   */
+  private fun handleConfigExport(
+      req: BridgeRequest,
+      controlEnabled: Boolean,
+      sourceNodeRef: String,
+  ): BridgeResponse {
+    consumeStandaloneEnvelope(req, controlEnabled, sourceNodeRef)?.let { return it }
+    return try {
+      if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
+      ok(req.requestId, exportConfig(req.parameters))
+    } catch (e: InvalidParametersException) {
+      err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
+    } catch (e: Exception) {
+      err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  /**
+   * Canonical `config.import`: dry-run returns the planned diff; a real import
+   * always needs on-phone Approve/Deny and never enables external control.
+   */
+  private fun handleConfigImport(
+      req: BridgeRequest,
+      controlEnabled: Boolean,
+      sourceNodeRef: String,
+  ): BridgeResponse {
+    consumeStandaloneEnvelope(req, controlEnabled, sourceNodeRef)?.let { return it }
+    return try {
+      if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
+      importConfig(req, sourceNodeRef)
+    } catch (e: InvalidParametersException) {
+      err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
+    } catch (e: ActionNotFound) {
+      err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
+    } catch (e: Exception) {
+      err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
+    }
+  }
+
+  /**
+   * Shared v1.1 envelope checks for standalone BridgeRequest ops. Null means
+   * the caller may proceed (nonce has been recorded).
+   */
+  private fun consumeStandaloneEnvelope(
+      req: BridgeRequest,
+      controlEnabled: Boolean,
+      sourceNodeRef: String,
+  ): BridgeResponse? {
     if (!controlEnabled)
         return err(
             req.requestId,
@@ -558,16 +664,7 @@ class FleetDispatcher(
         return err(req.requestId, ErrorCategory.EXPIRED, "envelope expired")
     if (nonceCache.seen(sourceNodeRef, nonce, now))
         return err(req.requestId, ErrorCategory.REPLAY_DETECTED, "nonce has already been used")
-    return try {
-      if (req.timeoutMs <= 0) throw InvalidParametersException("timeout_ms must be positive")
-      ok(req.requestId, nodeStatusResult(params))
-    } catch (e: InvalidParametersException) {
-      err(req.requestId, ErrorCategory.INVALID_PARAMETERS, e.message ?: "invalid parameters")
-    } catch (e: ActionNotFound) {
-      err(req.requestId, ErrorCategory.NOT_FOUND, e.message ?: "not found")
-    } catch (e: Exception) {
-      err(req.requestId, ErrorCategory.INTERNAL, "internal error: ${e.javaClass.simpleName}")
-    }
+    return null
   }
 
   private fun handleEnvelope(
@@ -864,8 +961,6 @@ class FleetDispatcher(
 
   private class SafetyRefused(msg: String) : Exception(msg)
 
-  private class ActionNotFound(msg: String) : Exception(msg)
-
   private fun runMeshAction(op: String, params: JsonObject = JsonObject(emptyMap())): JsonObject =
       when (op) {
         FleetProtocol.OP_CAPABILITIES ->
@@ -913,8 +1008,81 @@ class FleetDispatcher(
           }
         }
         FleetProtocol.OP_NODE_STATUS -> nodeStatusResult(params)
+        FleetProtocol.OP_CONFIG_EXPORT,
+        FleetProtocol.OP_CONFIG_IMPORT ->
+            throw InvalidParametersException("operation $op is not a remote.command actionRef")
         else -> throw InvalidParametersException("unsupported mesh action $op")
       }
+
+  private fun exportConfig(params: JsonObject): JsonObject {
+    val asked = BackupArgs.string(params, "packageName")
+    if (asked != null && asked != packageName) {
+      throw ActionNotFound("named packageName has no entry")
+    }
+    if (BackupArgs.string(params, "clearPayload") == "false") {
+      throw InvalidParametersException("encrypted export is not supported on this node")
+    }
+    val payload = configStore.snapshot()
+    val entry = UnifiedBackupCodec.thisNodeEntry(payload, packageName)
+    return UnifiedBackupCodec.encodeEntry(entry)
+  }
+
+  private fun importConfig(req: BridgeRequest, sourceNodeRef: String): BridgeResponse {
+    val params = req.parameters
+    val dryRun = BackupArgs.bool(params, "dryRun")
+    val policy = BackupConflictPolicy.fromWire(BackupArgs.string(params, "conflictPolicy"))
+    val asked = BackupArgs.string(params, "packageName") ?: packageName
+    val bundle = parseImportBundle(params)
+    val entry = UnifiedBackupCodec.entryForPackage(bundle, asked)
+    if (entry.packageName != packageName) {
+      throw ActionNotFound("named packageName has no entry")
+    }
+    val clear = UnifiedBackupCodec.unwrapClearPayload(bundle, entry)
+    val imported = UnifiedBackupCodec.decodePayload(clear)
+    val plan = BackupImporter.plan(configStore.snapshot(), imported, policy, dryRun)
+    val result = BackupImporter.encodeResult(plan)
+    if (dryRun) return ok(req.requestId, result)
+    val ttl = resolveTtlFromParams(params)
+    val pending =
+        confirmations.create(
+            actionRef = FleetProtocol.OP_CONFIG_IMPORT,
+            requestId = req.requestId,
+            sourceNodeRef = sourceNodeRef,
+            expiresAtMs = clock() + ttl,
+            importPayloadJson = UnifiedBackupCodec.encodePayload(plan.applied),
+            importResult = result,
+        )
+    confirmationSink.onConfirmationRequired(pending)
+    return err(
+        req.requestId,
+        ErrorCategory.CONFIRMATION_REQUIRED,
+        "config.import requires on-phone confirmation",
+    )
+  }
+
+  private fun parseImportBundle(params: JsonObject): UnifiedFleetBackup {
+    val asObject = BackupArgs.jsonObject(params, "bundle")
+    if (asObject != null) return UnifiedBackupCodec.decodeBundle(asObject)
+    val asString = BackupArgs.string(params, "bundle")
+        ?: throw InvalidParametersException("bundle is required")
+    return UnifiedBackupCodec.decodeBundle(asString)
+  }
+
+  private fun applyPendingImport(pending: PendingConfirmation): JsonObject {
+    val json = pending.importPayloadJson
+        ?: throw InvalidParametersException("pending import is missing a payload")
+    val payload = UnifiedBackupCodec.decodePayload(json)
+    configStore.apply(payload)
+    configStore.setExternalControlEnabled(false)
+    return pending.importResult ?: BackupImporter.encodeResult(
+        ImportPlan(
+            dryRun = false,
+            conflictPolicy = BackupConflictPolicy.SKIP,
+            changes = emptyList(),
+            applied = payload,
+        )
+    )
+  }
 
   private fun nodeStatusResult(params: JsonObject): JsonObject {
     resolveStatusTarget(params)

@@ -231,11 +231,13 @@ The controller **droidcommand-AI** (`ai.droidcommand.app`) can:
 - Read what this node supports
 - Read connection status (running or stopped, control server URL, mesh IP addresses)
 - Read a short **status tray** snapshot (`node.status.get`): mesh, VPN, and whether this app is alive. That answer does not include keys or IP addresses. The controller asks with a normal bridge request; turning the mesh off remotely still needs the on-phone tap, but this status read does not.
+- **Export** this app's non-secret settings (`config.export`): control server URL, tunnel mode, ordinary prefs, and WireGuard profile names. Never keys, tokens, or passwords.
+- **Import** a settings backup (`config.import`) after you tap Approve on this phone. A dry run only shows what would change. Import never turns on fleet remote control.
 - Turn the mesh **on**
 - Turn the mesh **off**
 - Read this phone's mesh IPv4 and IPv6
 
-It cannot read keys, auth keys, or other secrets. It cannot change the Headscale URL or log you in. It cannot start or stop a WireGuard profile.
+It cannot read keys, auth keys, or other secrets. It cannot log you in. It cannot start or stop a WireGuard profile, and a settings import never copies WireGuard private keys.
 
 **While WireGuard mode is on:** `mesh.status` reports the mesh as down (`connected: false`, no mesh IPs). `mesh.up` is refused until you switch back to mesh mode in the app. `mesh.down` does not tear down the WireGuard tunnel. The status-tray snapshot also shows the mesh as down and the VPN as up (the WireGuard tunnel).
 
@@ -274,6 +276,7 @@ The controller can send a newer kind of request on the same bridge. In plain lan
 
 - It can ask what this phone allows (`capabilities.get`) even when the Settings switch is off. That answer is a list only; it does not turn the mesh on or off.
 - It can ask for the status-tray snapshot (`node.status.get`) as its own read-only bridge request (with the same one-time, time-limited fields). That path does not go through the “turn the mesh off” confirmation. An older `remote.command` form still works as a compatible alias.
+- It can export or import this app's settings as their own bridge requests (`config.export` / `config.import`), not as a remote command. Import without a dry run always asks you to Approve or Deny on this phone. A dry run only reports the planned diff.
 - It can run one mesh action (`remote.command`) or a short list of steps (`macro.step` / `macro.run`). A “dry run” checks the list without doing anything.
 - Each request is time-limited (up to five minutes) and can be used only once, so an old or copied command is rejected. A request stamped more than two minutes in the future is also rejected. A command that is a few minutes old is still accepted if it is inside its time limit.
 - The command must name this phone. A blank or badly formed name is rejected as invalid. A well-formed name for some other phone is treated as not found. This phone, if the sender is not paired with it, is rejected as not paired.
@@ -283,7 +286,35 @@ The controller binds this app by package `com.victorious.mesh` plus the action `
 
 Technical field names, errors, and examples are in [FLEET_BRIDGE.md](FLEET_BRIDGE.md).
 
-**[not device-verified]** The envelope, time checks, pairing errors, the Approve/Deny notification, and the `node.status.get` snapshot on a real phone have not been run.
+### How to export and import this app's settings
+
+The fleet controller can ask this phone for a settings snapshot, or offer one
+back. That snapshot is **this app only** (`com.victorious.mesh`). It includes
+the Headscale / control URL, whether the tunnel is mesh or WireGuard, ordinary
+prefs (corporate DNS, want-running, exit-node LAN access), and WireGuard
+profile **names**. It does **not** include signing keys, Headscale or Tailscale
+auth keys, node keys, WireGuard private or preshared keys, API tokens, or
+passwords. If a backup would contain any of those names, the phone refuses it
+instead of stripping them.
+
+To restore:
+
+1. The controller can ask for a **dry run** first. That returns a list of what
+   would change and writes nothing.
+2. A real import posts an **Approve fleet action?** notification. Tap
+   **Approve** or **Deny** on this phone. Nothing in the request can skip that
+   tap.
+3. Choose how clashes are handled: **skip** (default — keep what is already on
+   the phone), **overwrite** (take the backup's row), or **merge-by-id** (keep
+   live rows and add missing ids).
+4. After a restore, **Allow fleet controller** stays **off**. Import cannot
+   turn remote control on.
+
+A new WireGuard profile name in a backup does not create a working tunnel —
+the private key is never in the file. You still add the `.conf` yourself
+under **Settings → WireGuard**.
+
+**[not device-verified]** The envelope, time checks, pairing errors, the Approve/Deny notification, the `node.status.get` snapshot, and settings export/import on a real phone have not been run.
 
 ## Troubleshooting and FAQ
 
