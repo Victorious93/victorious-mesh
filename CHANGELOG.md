@@ -15,6 +15,11 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Mesh speed / health (Settings → Mesh speed / health).** On-demand
+  snapshot of mesh grade, path mix (direct vs relay), lifetime
+  engine transfer, backend warnings, and one disco ping to the first
+  online IPv4 peer. Not an internet speed test. WireGuard mode
+  reports mesh down. No new fleet ops. **[not device-verified]**
 - **Tiles & widget (Settings → Tiles & widget).** Off by default.
   Extra Quick Settings tiles (kill switch, mesh-proxy share, status)
   and a home-screen status widget. The original VPN toggle tile is
