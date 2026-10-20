@@ -106,7 +106,18 @@ interface MeshBackend {
   fun up()
 
   fun down()
+
+  /**
+   * True while the app's single VpnService is running a plain WireGuard tunnel instead of the
+   * mesh. The mesh is down in that case.
+   */
+  fun wireGuardModeActive(): Boolean = false
 }
+
+/** Mesh status as seen by the fleet: in WireGuard mode the mesh is reported down. */
+fun MeshStatus.forTunnelMode(wireGuardActive: Boolean): MeshStatus =
+    if (wireGuardActive) copy(backendState = "Stopped", connected = false, ipv4 = null, ipv6 = null)
+    else this
 
 class InvalidParametersException(msg: String) : Exception(msg)
 
@@ -209,7 +220,7 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
               put("protocol_major", FleetProtocol.PROTOCOL_MAJOR)
             }
         FleetProtocol.OP_STATUS -> {
-          val s = backend.status()
+          val s = backend.status().forTunnelMode(backend.wireGuardModeActive())
           buildJsonObject {
             put("backend_state", s.backendState)
             put("connected", s.connected)
@@ -222,15 +233,23 @@ class FleetDispatcher(private val nodeId: String, private val backend: MeshBacke
               throw SafetyRefused(
                   "VPN permission not granted: the user must open the Victorious Mesh app once and approve the VPN"
               )
+          if (backend.wireGuardModeActive())
+              throw SafetyRefused(
+                  "WireGuard mode is active on this device; the user must switch back to mesh mode in the app"
+              )
           backend.up()
           buildJsonObject { put("requested", "up") }
         }
         FleetProtocol.OP_DOWN -> {
-          backend.down()
+          // WireGuard mode already reports the mesh as down; do not tear the
+          // WireGuard tunnel down from a mesh.down (no new fleet ops).
+          if (!backend.wireGuardModeActive()) {
+            backend.down()
+          }
           buildJsonObject { put("requested", "down") }
         }
         FleetProtocol.OP_IP_GET -> {
-          val s = backend.status()
+          val s = backend.status().forTunnelMode(backend.wireGuardModeActive())
           buildJsonObject {
             put("ipv4", s.ipv4)
             put("ipv6", s.ipv6)

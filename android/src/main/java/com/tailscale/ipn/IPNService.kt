@@ -13,6 +13,7 @@ import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
+import com.tailscale.ipn.wireguard.WireGuardManager
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,13 +50,20 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       when (intent?.action) {
         ACTION_STOP_VPN -> {
           app.setWantRunning(false)
+          stopWireGuard()
           close()
           START_NOT_STICKY
         }
         ACTION_RESTART_VPN -> {
+          // Split-tunnel / package-list changes restart the current tunnel.
+          // Stay in WireGuard mode if that is what is running.
+          val wgProfile =
+              if (WireGuardManager.isWireGuardActive()) {
+                WireGuardManager.persistedWireGuardProfile()
+              } else null
           app.setWantRunning(false) {
             close()
-            app.startVPN()
+            if (wgProfile != null) WireGuardManager.connect(app, wgProfile) else app.startVPN()
           }
           START_NOT_STICKY
         }
@@ -66,8 +74,16 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           showForegroundNotification()
           START_NOT_STICKY
         }
+        ACTION_START_WIREGUARD -> {
+          showForegroundNotification()
+          startWireGuard(intent.getStringExtra(EXTRA_WG_PROFILE_ID))
+          START_STICKY
+        }
         ACTION_START_VPN -> {
           showForegroundNotification()
+          // Mesh and WireGuard are mutually exclusive: tear WireGuard down first.
+          stopWireGuard()
+          WireGuardManager.onMeshStarting()
           app.setWantRunning(true)
           Libtailscale.requestVPN(this)
           START_STICKY
@@ -83,8 +99,13 @@ open class IPNService : VpnService(), libtailscale.IPNService {
                 UninitializedApp.getExitNodeName(Notifier.prefs.value, Notifier.netmap.value)
             app.notifyStatus(true, hideDisconnectAction.value, exitNodeName)
           }
-          app.setWantRunning(true)
-          Libtailscale.requestVPN(this)
+          val wgProfile = WireGuardManager.persistedWireGuardProfile()
+          if (wgProfile != null) {
+            startWireGuard(wgProfile)
+          } else {
+            app.setWantRunning(true)
+            Libtailscale.requestVPN(this)
+          }
           START_STICKY
         }
         else -> {
@@ -93,7 +114,8 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           if (UninitializedApp.get().isAbleToStartVPN()) {
             showForegroundNotification()
             App.get()
-            Libtailscale.requestVPN(this)
+            val wgProfile = WireGuardManager.persistedWireGuardProfile()
+            if (wgProfile != null) startWireGuard(wgProfile) else Libtailscale.requestVPN(this)
             START_STICKY
           } else {
             START_NOT_STICKY
@@ -101,9 +123,47 @@ open class IPNService : VpnService(), libtailscale.IPNService {
         }
       }
 
+  /**
+   * WireGuard mode: tear down the mesh tunnel (this service stays the single VpnService owner),
+   * then hand the wg-quick config to the in-process wireguard-go in libtailscale. Only the
+   * profile id travels in the Intent; the config (with keys) is read from encrypted storage.
+   */
+  private fun startWireGuard(profileId: String?) {
+    scope.launch {
+      val conf =
+          profileId?.let { id -> runCatching { WireGuardManager.store().config(id) }.getOrNull() }
+      if (profileId == null || conf == null) {
+        WireGuardManager.onError("WireGuard profile not found")
+        return@launch
+      }
+      app.setWantRunning(false)
+      Libtailscale.serviceDisconnect(this@IPNService)
+      try {
+        Libtailscale.startWireGuard(this@IPNService, conf)
+        WireGuardManager.onWireGuardStarted(profileId)
+        TSLog.d(TAG, "WireGuard mode up")
+      } catch (e: Exception) {
+        // Go errors never include key material (see libtailscale/wgtunnel.go).
+        TSLog.e(TAG, "WireGuard start failed: ${e.message}")
+        WireGuardManager.onError(e.message ?: "WireGuard failed to start")
+        updateVpnStatus(false)
+        stopSelf()
+      }
+    }
+  }
+
+  private fun stopWireGuard() {
+    if (Libtailscale.wireGuardRunning()) {
+      Libtailscale.stopWireGuard()
+      updateVpnStatus(false)
+    }
+    WireGuardManager.onStopped()
+  }
+
   override fun close() {
     if (closed) return
     closed = true
+    stopWireGuard()
     Notifier.setState(Ipn.State.Stopping)
     disconnectVPN()
     Libtailscale.serviceDisconnect(this)
@@ -192,6 +252,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     val b: Builder =
         Builder()
             .setConfigureIntent(configIntent())
+            .setBlocking(true)
             .allowFamily(OsConstants.AF_INET)
             .allowFamily(OsConstants.AF_INET6)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -256,6 +317,8 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     const val ACTION_STOP_VPN = "com.tailscale.ipn.STOP_VPN"
     const val ACTION_RESTART_VPN = "com.tailscale.ipn.RESTART_VPN"
     const val ACTION_START_FOREGROUND_ONLY = "com.tailscale.ipn.START_FOREGROUND_ONLY"
+    const val ACTION_START_WIREGUARD = "com.tailscale.ipn.START_WIREGUARD"
+    const val EXTRA_WG_PROFILE_ID = "com.tailscale.ipn.WG_PROFILE_ID"
   }
 }
 

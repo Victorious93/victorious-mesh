@@ -96,6 +96,7 @@ import com.tailscale.ipn.ui.view.TaildropDirectoryPickerPrompt
 import com.tailscale.ipn.ui.view.TailnetLockSetupView
 import com.tailscale.ipn.ui.view.UserSwitcherNav
 import com.tailscale.ipn.ui.view.UserSwitcherView
+import com.tailscale.ipn.ui.view.WireGuardView
 import com.tailscale.ipn.ui.viewModel.AppViewModel
 import com.tailscale.ipn.ui.viewModel.ExitNodePickerNav
 import com.tailscale.ipn.ui.viewModel.MainViewModel
@@ -333,10 +334,12 @@ class MainActivity : ComponentActivity() {
                         viewModel.enableSearchAutoFocus()
                         navController.navigate("search")
                       },
+                      onNavigateToWireGuard = { navController.navigate("wireguard") },
                   )
               val settingsNav =
                   SettingsNav(
                       onNavigateToControlServer = { navController.navigate("controlServer") },
+                      onNavigateToWireGuard = { navController.navigate("wireguard") },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -421,6 +424,7 @@ class MainActivity : ComponentActivity() {
               composable("tailnetLock") { TailnetLockSetupView(backTo("settings")) }
               composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }
               composable("about") { AboutView(backTo("settings")) }
+              composable("wireguard") { WireGuardView(backTo("settings")) }
               composable("controlServer") {
                 ControlServerView(
                     onBack = backTo("settings"),

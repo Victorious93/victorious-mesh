@@ -41,6 +41,7 @@ import com.tailscale.ipn.util.HardwareKeyStore
 import com.tailscale.ipn.util.NoSuchKeyException
 import com.tailscale.ipn.util.ShareFileHelper
 import com.tailscale.ipn.util.TSLog
+import com.tailscale.ipn.wireguard.WireGuardManager
 import java.io.IOException
 import java.lang.UnsupportedOperationException
 import java.net.NetworkInterface
@@ -177,6 +178,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
     // for Hostname and only corrects it after policyReloadMinDelay,
     // at which point the device may have already registered with the wrong hostname.
     MDMSettings.loadFrom(lazy { getEncryptedPrefs() }, rm)
+    WireGuardManager.load()
 
     if (storedUri != null && storedUri.toString().startsWith("content://")) {
       startLibtailscale(storedUri.toString(), hardwareAttestation)
@@ -208,7 +210,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
               // If VPN is stopped, show a disconnected notification. If it is running as a
               // foreground
               // service, IPNService will show a connected notification.
-              if (state == Ipn.State.Stopped) {
+              if (state == Ipn.State.Stopped && !WireGuardManager.isWireGuardActive()) {
                 notifyStatus(vpnRunning = false, hideDisconnectAction = hideDisconnectAction.value)
               }
               val vpnRunning = state == Ipn.State.Starting || state == Ipn.State.Running

@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       NDK_VERSION: 26.1.10909125
     steps:
@@ -36,6 +36,9 @@ jobs:
           SDKM=$(ls -1d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n1)
           yes | "$SDKM" --licenses > /dev/null || true
           "$SDKM" --install "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+
+      - name: Go unit tests (WireGuard config parser)
+        run: go test ./libtailscale/wgquick/...
 
       - name: Build Go core (gomobile AAR, arm64-v8a + armeabi-v7a)
         run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" ./scripts/build-aar.sh

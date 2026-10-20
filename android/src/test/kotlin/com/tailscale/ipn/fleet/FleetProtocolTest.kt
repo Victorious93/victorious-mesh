@@ -1,5 +1,6 @@
 package com.tailscale.ipn.fleet
 
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
@@ -14,8 +15,13 @@ import org.junit.Test
 class FleetProtocolTest {
   private val node = "mesh-0123456789abcdef0123456789abcdef"
 
-  private class FakeBackend(var consent: Boolean = true, var throwOnStatus: Boolean = false) :
-      MeshBackend {
+  private class FakeBackend(
+      var consent: Boolean = true,
+      var throwOnStatus: Boolean = false,
+      var wireGuard: Boolean = false,
+  ) : MeshBackend {
+    override fun wireGuardModeActive() = wireGuard
+
     var ups = 0
     var downs = 0
 
@@ -144,6 +150,42 @@ class FleetProtocolTest {
     assertCat("safety_refused", r)
     assertTrue(r.error!!.message.contains("open", ignoreCase = true))
     assertEquals(0, be.ups)
+  }
+
+  @Test
+  fun statusReportsMeshDownInWireGuardMode() {
+    val r = call(req("mesh.status"), FakeBackend(wireGuard = true))
+    assertTrue(r.ok)
+    assertFalse(r.result!!["connected"]!!.jsonPrimitive.boolean)
+    assertEquals("Stopped", r.result!!["backend_state"]!!.jsonPrimitive.content)
+    assertEquals(0, r.result!!["ips"]!!.jsonArray.size)
+  }
+
+  @Test
+  fun ipGetIsEmptyInWireGuardMode() {
+    val r = call(req("mesh.ip.get"), FakeBackend(wireGuard = true))
+    assertTrue(r.ok)
+    assertEquals(JsonNull, r.result!!["ipv4"])
+  }
+
+  @Test
+  fun upIsRefusedInWireGuardMode() {
+    val be = FakeBackend(wireGuard = true)
+    assertCat("safety_refused", call(req("mesh.up"), be))
+    assertEquals(0, be.ups)
+  }
+
+  @Test
+  fun downDoesNotStopWireGuardTunnel() {
+    val be = FakeBackend(wireGuard = true)
+    assertTrue(call(req("mesh.down"), be).ok)
+    assertEquals(0, be.downs)
+  }
+
+  @Test
+  fun forTunnelModeIsIdentityInMeshMode() {
+    val s = MeshStatus("Running", true, null, "100.64.0.1", null)
+    assertEquals(s, s.forTunnelMode(false))
   }
 
   @Test fun unsupportedOperation() = assertCat("unsupported_operation", call(req("mesh.exit_node.set")))
