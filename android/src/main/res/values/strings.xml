@@ -422,7 +422,7 @@
     <string name="fleet_confirm_channel_desc">Asks you to approve destructive fleet actions on this phone</string>
     <string name="fleet_confirm_title">Approve fleet action?</string>
     <string name="fleet_confirm_down">The fleet controller wants to turn the mesh off. This cuts the network for every fleet app on this phone.</string>
-    <string name="fleet_confirm_import">The fleet controller wants to restore this app's settings from a backup. This does not turn on remote control. Approve it on this phone.</string>
+    <string name="fleet_confirm_import">The fleet controller wants to restore this app\'s settings from a backup. This does not turn on remote control. Approve it on this phone.</string>
     <string name="fleet_confirm_generic">The fleet controller wants to run %1$s. Approve it on this phone.</string>
     <string name="fleet_confirm_approve">Approve</string>
     <string name="fleet_confirm_deny">Deny</string>
