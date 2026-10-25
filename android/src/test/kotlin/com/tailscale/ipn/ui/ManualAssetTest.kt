@@ -76,6 +76,23 @@ class ManualAssetTest {
   }
 
   @Test
+  fun meshSpeedHealthIsDocumented() {
+    val stream = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)
+    assertNotNull(stream)
+    val text = stream!!.bufferedReader().use { it.readText() }
+    assertTrue("manual should have Mesh speed / health", text.contains("### Mesh speed / health"))
+    assertTrue(
+        "manual should say this is not an internet speed test",
+        text.contains("not an internet speed test"),
+    )
+    assertTrue("manual should mention disco ping", text.contains("disco ping"))
+    assertTrue(
+        "manual should say there is no fleet operation",
+        text.contains("no fleet operation"),
+    )
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

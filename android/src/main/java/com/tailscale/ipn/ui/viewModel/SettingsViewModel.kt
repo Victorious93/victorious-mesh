@@ -36,6 +36,7 @@ data class SettingsNav(
     val onNavigateToLeakChecker: () -> Unit = {},
     val onNavigateToVictorGps: () -> Unit = {},
     val onNavigateToTilesWidget: () -> Unit = {},
+    val onNavigateToMeshHealth: () -> Unit = {},
 )
 
 class SettingsViewModel : IpnViewModel() {

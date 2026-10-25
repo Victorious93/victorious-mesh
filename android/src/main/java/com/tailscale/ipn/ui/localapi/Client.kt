@@ -84,9 +84,12 @@ class Client(private val scope: CoroutineScope) {
   }
 
   fun ping(peer: Tailcfg.Node, responseHandler: PingResultHandler) {
-    val ip = peer.primaryIPv4Address.orEmpty()
+    ping(peer.primaryIPv4Address.orEmpty(), responseHandler)
+  }
+
+  fun ping(ip: String, responseHandler: PingResultHandler) {
     if (ip.isEmpty()) {
-      responseHandler(Result.failure(Exception("No IP address for peer $peer")))
+      responseHandler(Result.failure(Exception("No IP address")))
       return
     }
 
