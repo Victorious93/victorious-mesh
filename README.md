@@ -230,6 +230,21 @@ relay), lifetime tunnel transfer, backend health warnings, and one
 disco ping to the first online IPv4 peer. Not an internet speed test.
 WireGuard mode reports mesh down. No new fleet operations.
 
+## Fleet theme
+
+VictorLaunch is the source of truth (`FLEET_THEME` schemaVersion 1).
+**[not device-verified]**
+
+This app queries `content://com.victorious.launch.theme/current` on
+start, registers a `ContentObserver`, and an exported receiver for
+`com.victorious.launch.action.FLEET_THEME_CHANGED`. `palette.*` is
+applied live in Compose. VictorLaunch is authenticated by package +
+signing-cert pin (`com.victorious.launch`, debug cert
+`B9:9A:AF:E2:…:4E:4A:69`). The signature permission is not used as
+auth. On `SecurityException`, an unpinned provider, or any
+`schemaVersion` other than 1, the built-in neon theme stays. This app
+never writes the provider. No new fleet operations.
+
 ## Build and run
 
 You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.

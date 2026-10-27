@@ -15,6 +15,14 @@
   keys are ignored; only a malformed `args.nodeId` is `invalid_parameters`.
 
 ### Added
+- **Fleet theme (FLEET_THEME schemaVersion 1).** Reads
+  `content://com.victorious.launch.theme/current` on start, observes it,
+  and listens for `com.victorious.launch.action.FLEET_THEME_CHANGED`.
+  Applies `palette.*` live in Compose. Authenticates VictorLaunch by
+  package + cert pin (not the signature permission). SecurityException,
+  unpinned provider, or any `schemaVersion` other than 1 falls back to
+  the built-in neon theme. Never writes the provider. No new fleet ops.
+  **[not device-verified]**
 - **Mesh speed / health (Settings → Mesh speed / health).** On-demand
   snapshot of mesh grade, path mix (direct vs relay), lifetime
   engine transfer, backend warnings, and one disco ping to the first

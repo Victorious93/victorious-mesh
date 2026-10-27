@@ -76,6 +76,30 @@ class ManualAssetTest {
   }
 
   @Test
+  fun fleetThemeIsDocumented() {
+    val stream = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)
+    assertNotNull(stream)
+    val text = stream!!.bufferedReader().use { it.readText() }
+    assertTrue("manual should have Fleet theme", text.contains("### Fleet theme"))
+    assertTrue(
+        "manual should name the theme URI",
+        text.contains("content://com.victorious.launch.theme/current"),
+    )
+    assertTrue(
+        "manual should say schemaVersion 1",
+        text.contains("schemaVersion 1"),
+    )
+    assertTrue(
+        "manual should say this app never writes the provider",
+        text.contains("never writes"),
+    )
+    assertTrue(
+        "manual should mention package + signing-cert pin",
+        text.contains("package + signing-cert pin"),
+    )
+  }
+
+  @Test
   fun meshSpeedHealthIsDocumented() {
     val stream = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)
     assertNotNull(stream)
