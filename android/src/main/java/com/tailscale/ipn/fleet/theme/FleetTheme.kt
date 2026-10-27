@@ -186,7 +186,10 @@ object FleetThemeCodec {
           iconStyle = FleetIconStyle.parse(obj["iconStyle"]?.jsonPrimitive?.contentOrNull),
           iconPackPackage =
               obj["iconPackPackage"]?.jsonPrimitive?.contentOrNull?.ifBlank { null },
-          palette = paletteFrom(paletteObj::hex),
+          palette =
+              paletteFrom { key, fallback ->
+                hexOrNeon(paletteObj[key]?.jsonPrimitive?.contentOrNull, fallback)
+              },
           updatedAtMs = obj["updatedAtMs"]?.jsonPrimitive?.longOrNull ?: 0L,
           source = FleetThemeSource.FLEET,
       )
@@ -210,9 +213,6 @@ object FleetThemeCodec {
         source = FleetThemeSource.FLEET,
     )
   }
-
-  private fun JsonObject.hex(key: String, fallback: String): String =
-      hexOrNeon(this[key]?.jsonPrimitive?.contentOrNull, fallback)
 
   private fun hexOrNeon(raw: String?, fallback: String): String {
     val value = raw?.trim()?.ifBlank { null } ?: return fallback
