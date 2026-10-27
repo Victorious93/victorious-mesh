@@ -17,6 +17,11 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <queries>
+        <package android:name="com.victorious.launch" />
+        <provider android:authorities="com.victorious.launch.theme" />
+    </queries>
+
     <!-- Disable input emulation on ChromeOS -->
     <uses-feature
         android:name="android.hardware.type.pc"
@@ -166,6 +171,13 @@
             <intent-filter>
                 <action android:name="com.victorious.mesh.action.FLEET_CONFIRM_APPROVE" />
                 <action android:name="com.victorious.mesh.action.FLEET_CONFIRM_DENY" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name="com.tailscale.ipn.fleet.FleetThemeChangedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.victorious.launch.action.FLEET_THEME_CHANGED" />
             </intent-filter>
         </receiver>
         <service

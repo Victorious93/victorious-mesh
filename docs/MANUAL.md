@@ -311,6 +311,24 @@ This page snapshots the mesh on this phone:
 
 **Limits.** WireGuard mode reports mesh **down** — this page is for the mesh, not a WireGuard profile. A mixed path (some direct, some relay) is still OK. All-relay, no online peers, or backend warnings are degraded. High disco-ping latency (250 ms or more) is a warning, not a down grade. There is **no fleet operation** for this.
 
+### Fleet theme
+
+![Fleet theme](images/manual/fleet-theme.png)
+
+*Screenshot pending.*
+
+**VictorLaunch is the source of truth.** There is no theme picker in this app.
+
+**[not device-verified]**
+
+On start, Victorious Mesh reads `content://com.victorious.launch.theme/current` (FLEET_THEME schemaVersion 1). It also watches that URI and listens for `com.victorious.launch.action.FLEET_THEME_CHANGED`. When Don changes **Settings → Fleet theme** in VictorLaunch, this app re-queries and applies `palette.*` live.
+
+This app **never writes** the provider. Broadcast extras are a wake-up only — they are not the theme and never authorize.
+
+VictorLaunch is authenticated by **package + signing-cert pin** (`com.victorious.launch`, debug cert `B9:9A:AF:E2:…:4E:4A:69`). The declared signature permission is not enough: the fleet does not share a signing key. Release cert TBD.
+
+If the query throws `SecurityException`, the provider is missing, the package/cert is not pinned, or `schemaVersion` is not `1`, the app keeps the built-in neon-on-charcoal theme. Ask Don to **Trust installed fleet share apps** in VictorLaunch if this app is not pinned there. There is **no fleet operation** for this.
+
 ### App split tunneling
 
 **Settings → App split tunneling**
@@ -418,6 +436,8 @@ The controller **droidcommand-AI** (`ai.droidcommand.app`) can:
 It cannot read keys, auth keys, or other secrets. It cannot log you in. It cannot start or stop a WireGuard profile, and a settings import never copies WireGuard private keys.
 
 **Victorious Browser** (`com.victorious.browser`) is a read-only fleet app. After you switch on **Allow fleet controller**, it may only ask for connection status and this phone's mesh IP. It cannot turn the mesh on or off, cannot read the status-tray snapshot, and cannot use the newer remote-control commands. Other operations are refused as not authorized. Mesh IP addresses are never written to logs or backups. **[not device-verified]**
+
+**Fleet theme** is not a bridge operation. VictorLaunch publishes the palette; this app only reads it. See **Features → Fleet theme**. **[not device-verified]**
 
 **While WireGuard mode is on:** `mesh.status` reports the mesh as down (`connected: false`, no mesh IPs). `mesh.up` is refused until you switch back to mesh mode in the app. `mesh.down` does not tear down the WireGuard tunnel. The status-tray snapshot also shows the mesh as down and the VPN as up (the WireGuard tunnel).
 
@@ -532,6 +552,8 @@ under **Settings → WireGuard**.
 **I cannot find the extra tiles or the widget.** Turn on **Settings → Tiles & widget**, then add them from the Quick Settings editor or the home-screen widget picker. The original Victorious Mesh tile is always available. **[not device-verified]**
 
 **Mesh speed / health looks slow or only shows relay.** This is not an internet speed test. It reports mesh path quality and one disco ping to a peer. Relayed paths are expected when UDP is blocked. WireGuard mode reports mesh down. **[not device-verified]**
+
+**The colors did not follow VictorLaunch.** This app only reads the fleet theme. If VictorLaunch is missing, this app is not pinned there, or the schema is not version 1, it stays on the built-in neon theme. Ask Don to **Trust installed fleet share apps**. **[not device-verified]**
 
 **Is there an ad blocker or router dashboard?** Not yet — see **Coming soon**.
 

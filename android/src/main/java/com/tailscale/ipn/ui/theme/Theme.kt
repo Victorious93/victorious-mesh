@@ -20,16 +20,23 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.tailscale.ipn.fleet.theme.FleetThemeClient
+import com.tailscale.ipn.fleet.theme.FleetThemeMode
+import com.tailscale.ipn.fleet.theme.FleetThemePalettes
+import com.tailscale.ipn.fleet.theme.FleetThemeSnapshot
+import com.tailscale.ipn.fleet.theme.FleetThemeSource
 
 @Composable
 fun AppTheme(useDarkTheme: Boolean = true, content: @Composable() () -> Unit) {
-  // Victorious Mesh: always use the neon-on-charcoal dark scheme.
-  val colors = DarkColors
+  val fleet by FleetThemeClient.snapshot.collectAsState()
+  val colors = colorSchemeFor(fleet)
 
   val typography =
       Typography(
@@ -44,7 +51,7 @@ fun AppTheme(useDarkTheme: Boolean = true, content: @Composable() () -> Unit) {
   // TODO: Migrate to Activity.enableEdgeToEdge
   @Suppress("deprecation") val systemUiController = rememberSystemUiController()
 
-  DisposableEffect(systemUiController, useDarkTheme) {
+  DisposableEffect(systemUiController, useDarkTheme, colors) {
     systemUiController.setStatusBarColor(color = colors.surfaceContainer)
     systemUiController.setNavigationBarColor(color = Color.Black)
     onDispose {}
@@ -81,6 +88,81 @@ private val LightColors =
         inverseOnSurface = Color(0xFFFFFFFF), // white
         scrim = Color(0xAA000000), // black
     )
+
+internal fun colorSchemeFor(snapshot: FleetThemeSnapshot): ColorScheme {
+  return if (snapshot.source == FleetThemeSource.BUILTIN_NEON) {
+    DarkColors
+  } else {
+    schemeFromPalette(snapshot)
+  }
+}
+
+private fun schemeFromPalette(snapshot: FleetThemeSnapshot): ColorScheme {
+  val palette = snapshot.palette
+  val background = paletteColor(palette.background, 0xFF111215)
+  val surface = paletteColor(palette.surface, 0xFF1A1B20)
+  val primary = paletteColor(palette.primary, 0xFF00E5FF)
+  val secondary = paletteColor(palette.secondary, 0xFFFF2BD6)
+  val onBackground = paletteColor(palette.onBackground, 0xFFEAF6FA)
+  val muted = paletteColor(palette.muted, 0xFFA6AEB8)
+  val danger = paletteColor(palette.danger, 0xFFFF5370)
+  val stale = paletteColor(palette.stale, 0xFFBB5504)
+  val tile = paletteColor(palette.tile, 0xFF111215)
+  val onPrimary =
+      when (snapshot.mode) {
+        FleetThemeMode.LIGHT -> onBackground
+        FleetThemeMode.DARK,
+        FleetThemeMode.NEON_FLEET,
+        FleetThemeMode.MATERIAL_YOU -> background
+      }
+  return when (snapshot.mode) {
+    FleetThemeMode.LIGHT ->
+        lightColorScheme(
+            primary = primary,
+            onPrimary = Color.White,
+            secondary = secondary,
+            onSecondary = Color.White,
+            tertiary = stale,
+            error = danger,
+            onError = Color.White,
+            background = background,
+            onBackground = onBackground,
+            surface = surface,
+            onSurface = onBackground,
+            onSurfaceVariant = muted,
+            surfaceContainer = tile,
+            surfaceContainerLow = tile,
+            surfaceContainerHigh = surface,
+            surfaceVariant = surface,
+        )
+    FleetThemeMode.DARK,
+    FleetThemeMode.NEON_FLEET,
+    FleetThemeMode.MATERIAL_YOU ->
+        darkColorScheme(
+            primary = primary,
+            onPrimary = onPrimary,
+            secondary = secondary,
+            onSecondary = onPrimary,
+            tertiary = stale,
+            error = danger,
+            onError = Color.White,
+            background = background,
+            onBackground = onBackground,
+            surface = surface,
+            onSurface = onBackground,
+            onSurfaceVariant = muted,
+            surfaceContainer = tile,
+            surfaceContainerLow = tile,
+            surfaceContainerHigh = surface,
+            surfaceVariant = surface,
+        )
+  }
+}
+
+private fun paletteColor(hex: String, fallback: Long): Color {
+  val argb = FleetThemePalettes.parseArgb(hex) ?: fallback
+  return Color(argb)
+}
 
 private val DarkColors =
     darkColorScheme(
