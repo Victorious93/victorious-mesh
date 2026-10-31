@@ -487,11 +487,29 @@ object FleetRedaction {
 
   fun redact(text: String): String = V6.replace(V4.replace(text, "[mesh-ip]"), "[mesh-ip]")
 
+  /**
+   * True if any object key anywhere in the JSON (after unescaping) is a
+   * forbidden key. Values are not keys: `{"note":"ips"}` is allowed. Text
+   * that is not valid JSON falls back to the conservative substring check.
+   */
   fun jsonContainsBackupForbiddenKeys(text: String): Boolean {
+    val el =
+        runCatching { Json.parseToJsonElement(text) }.getOrNull()
+            ?: return substringForbidden(text)
+    return hasForbiddenKey(el)
+  }
+
+  private fun hasForbiddenKey(el: JsonElement): Boolean =
+      when (el) {
+        is JsonObject ->
+            el.entries.any { (k, v) -> k.lowercase() in BACKUP_FORBIDDEN_KEYS || hasForbiddenKey(v) }
+        is JsonArray -> el.any { hasForbiddenKey(it) }
+        else -> false
+      }
+
+  private fun substringForbidden(text: String): Boolean {
     val lower = text.lowercase()
-    return BACKUP_FORBIDDEN_KEYS.any { key ->
-      lower.contains("\"$key\"") || lower.contains("\"$key\":")
-    }
+    return BACKUP_FORBIDDEN_KEYS.any { key -> lower.contains("\"$key\"") }
   }
 }
 

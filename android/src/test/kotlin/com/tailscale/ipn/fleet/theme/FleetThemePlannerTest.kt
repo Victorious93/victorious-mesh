@@ -233,4 +233,11 @@ class FleetThemePlannerTest {
         )
     assertTrue(d is FleetThemeDecision.Fallback)
   }
+
+  @Test
+  fun registerRetryIsCapped() {
+    org.junit.Assert.assertTrue(FleetThemePlanner.shouldRetryRegister(1, 5))
+    org.junit.Assert.assertTrue(FleetThemePlanner.shouldRetryRegister(5, 5))
+    org.junit.Assert.assertFalse(FleetThemePlanner.shouldRetryRegister(6, 5))
+  }
 }
