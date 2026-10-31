@@ -424,15 +424,24 @@ object CallerAllowlist {
   const val BROWSER_DEBUG_CERT =
       "2D:5D:9E:8B:53:8E:78:51:3D:B5:41:F4:DF:FD:67:BE:27:FF:EC:3F:37:EB:1A:D4:8D:77:83:AE:59:27:C3:E1"
 
-  private val DCA_CERTS = setOf(normalize(DCA_DEBUG_CERT), normalize(DCA_RELEASE_CERT))
-  private val BROWSER_CERTS = setOf(normalize(BROWSER_DEBUG_CERT))
+  /**
+   * Pins honoured by this build. Debug certs come from publicly committed debug
+   * keystores, so they are only trusted when [debug] is true (BuildConfig.DEBUG).
+   * Release builds trust only the fleet release cert for droidcommand-AI; the
+   * debug-only package and the browser (no release cert yet) are absent.
+   */
+  fun entriesFor(debug: Boolean): Map<String, Set<String>> {
+    val release = normalize(DCA_RELEASE_CERT)
+    if (!debug) return mapOf(PKG_DCA to setOf(release))
+    val dca = setOf(normalize(DCA_DEBUG_CERT), release)
+    return mapOf(
+        PKG_DCA to dca,
+        PKG_DCA_DEBUG to dca,
+        PKG_BROWSER to setOf(normalize(BROWSER_DEBUG_CERT)),
+    )
+  }
 
-  val ENTRIES: Map<String, Set<String>> =
-      mapOf(
-          PKG_DCA to DCA_CERTS,
-          PKG_DCA_DEBUG to DCA_CERTS,
-          PKG_BROWSER to BROWSER_CERTS,
-      )
+  val ENTRIES: Map<String, Set<String>> = entriesFor(com.victorious.mesh.BuildConfig.DEBUG)
 
   fun normalize(fp: String) = fp.replace(":", "").replace(" ", "").lowercase()
 

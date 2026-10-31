@@ -210,7 +210,7 @@ Pick a route for each installed app. **[not device-verified]**
 When this is on and you have started the mesh or WireGuard, the app treats that as “the tunnel should stay up”:
 
 1. An unexpected drop (service killed, TUN closed, Always-on restart) holds a **blocking** VPN so apps cannot fall back to Wi‑Fi or cellular, then tries to reconnect.
-2. Turn the **main-screen switch** or the Quick Settings tile **off** to leave. That is an explicit disconnect and tears the hold down.
+2. Turn the **main-screen switch** or the Quick Settings tile **off** to leave. That is an explicit disconnect and tears the hold down. A disconnect **broadcast** from another app is refused while the kill switch is armed.
 3. A link opens Android’s VPN settings. **Always-on VPN** plus **Block connections without VPN** is the stronger, system-level lock. Use that if you need the OS to refuse traffic whenever this app is not the VPN.
 
 **Limits.** Another app taking the VPN slot (`onRevoke`) cannot be held — the system gives that app the interface. Apps set to **Direct** in Per-app routing still bypass. The blackhole uses documentation addresses (`192.0.2.1` / `2001:db8::1`) and is replaced when the real tunnel comes back. IPv6 hold can fail on some devices. There is **no fleet operation** for this.
@@ -325,7 +325,7 @@ On start, Victorious Mesh reads `content://com.victorious.launch.theme/current` 
 
 This app **never writes** the provider. Broadcast extras are a wake-up only — they are not the theme and never authorize.
 
-VictorLaunch is authenticated by **package + signing-cert pin** (`com.victorious.launch`, debug cert `B9:9A:AF:E2:…:4E:4A:69`). The declared signature permission is not enough: the fleet does not share a signing key. Release cert TBD.
+VictorLaunch is authenticated by **package + signing-cert pin** (`com.victorious.launch`, debug cert `B9:9A:AF:E2:…:4E:4A:69`). The declared signature permission is not enough: the fleet does not share a signing key. The debug cert is pinned in **debug builds only**; release cert TBD, so a release build always uses the built-in theme.
 
 If the query throws `SecurityException`, the provider is missing, the package/cert is not pinned, or `schemaVersion` is not `1`, the app keeps the built-in neon-on-charcoal theme. Ask Don to **Trust installed fleet share apps** in VictorLaunch if this app is not pinned there. There is **no fleet operation** for this.
 
@@ -418,7 +418,7 @@ Victorious Mesh asks for the following. Android's VPN permission is separate fro
 | Foreground service | Keeps the VPN running while the app is in the background. |
 | Query all packages | Builds the list of installed apps for split tunneling. |
 
-The VPN service itself is not exported to other apps. The fleet bridge service *is* exported, but every call is checked (see Fleet integration). Android backup is turned **off** for this app.
+The VPN service itself is not exported to other apps. The connect / disconnect / exit-node broadcast receiver (`com.tailscale.ipn.CONNECT_VPN`, `DISCONNECT_VPN`, `USE_EXIT_NODE`) is protected by the signature permission `com.victorious.mesh.permission.CONTROL_VPN`, so only apps signed with this app's own key can send them. Automation apps such as Tasker can no longer use these broadcasts. A disconnect broadcast is also **refused while the kill switch is on and armed**: another app can never turn the kill switch off. The fleet bridge service *is* exported, but every call is checked (see Fleet integration). Android backup is turned **off** for this app.
 
 ## Fleet integration
 
@@ -458,6 +458,8 @@ Only these packages are accepted, and only if they are signed with a pinned cert
 | `ai.droidcommand.app` | Full | Debug `88:00:51:A6:D9:5D:38:DD:8D:81:E1:93:1E:17:05:48:03:87:D5:93:C3:09:43:53:99:68:E6:EF:11:A0:C8:4D` and release `9E:A7:B3:14:94:5B:0A:62:97:15:6F:F7:06:E7:0C:0A:B1:B7:24:DE:06:D5:09:9C:A5:12:8A:B4:43:F7:2D:8D` |
 | `ai.droidcommand.app.debug` | Full | The same two certificates |
 | `com.victorious.browser` | Status and mesh IP only | Debug `2D:5D:9E:8B:53:8E:78:51:3D:B5:41:F4:DF:FD:67:BE:27:FF:EC:3F:37:EB:1A:D4:8D:77:83:AE:59:27:C3:E1` (release certificate not set yet) |
+
+**Debug certificates are trusted in debug builds only.** Debug keystores are committed in public repos, so a release build trusts only the droidcommand-AI **release** certificate for `ai.droidcommand.app`. In release, `ai.droidcommand.app.debug` and `com.victorious.browser` (no release certificate yet) are not accepted. The same rule applies to the VictorLaunch theme pin: a release build has no VictorLaunch pin yet and keeps the built-in theme.
 
 Anything else is rejected. Victorious Mesh is signed with its **own** key; it does not share a signing key with the controller.
 
