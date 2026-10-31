@@ -7,7 +7,8 @@ import (
 	"context"
 	"log"
 	"net"
-	"syscall"
+	"sync"
+	"time"
 
 	"net/netip"
 
@@ -35,6 +36,7 @@ func SetForcedUpstream(kind, host string, port int32, username, password string,
 		return err
 	}
 	reconfigureForcedVPN()
+	startLoopWatch()
 	return nil
 }
 
@@ -80,21 +82,66 @@ func applyForcedRoutes(rcfg *router.Config) *router.Config {
 	next := *rcfg
 	next.Routes = append(append([]netip.Prefix(nil), rcfg.Routes...), upstreamproxy.DefaultRoutes()...)
 	ex := append(upstreamproxy.LoopPrefixes(cfg.Host), upstreamproxy.ResolveLoopPrefixes(cfg.Host)...)
+	upstreamproxy.NoteLoopPrefixes(ex)
 	next.LocalRoutes = append(append([]netip.Prefix(nil), rcfg.LocalRoutes...), ex...)
 	return &next
 }
 
+// vpnServiceMu guards vpnService.service for readers outside the
+// backend loop (the forced-proxy dialer runs on gVisor goroutines).
+var vpnServiceMu sync.RWMutex
+
+func setVPNService(s IPNService) {
+	vpnServiceMu.Lock()
+	vpnService.service = s
+	vpnServiceMu.Unlock()
+}
+
+func currentVPNService() IPNService {
+	vpnServiceMu.RLock()
+	defer vpnServiceMu.RUnlock()
+	return vpnService.service
+}
+
+// protectedDial reaches the proxy outside the VPN. If the socket cannot
+// be protected the dial fails instead of looping into the TUN.
 func protectedDial(ctx context.Context, network, address string) (net.Conn, error) {
-	d := net.Dialer{
-		Control: func(_, _ string, c syscall.RawConn) error {
-			return c.Control(func(fd uintptr) {
-				if vpnService.service != nil {
-					if !vpnService.service.Protect(int32(fd)) {
-						log.Printf("forced upstream: protect(%d) returned false", fd)
-					}
-				}
-			})
-		},
+	var protect func(int32) bool
+	if svc := currentVPNService(); svc != nil {
+		protect = func(fd int32) bool {
+			if svc.Protect(fd) {
+				return true
+			}
+			log.Printf("forced upstream: protect(%d) returned false", fd)
+			return false
+		}
 	}
+	d := net.Dialer{Control: upstreamproxy.ProtectControl(protect)}
 	return d.DialContext(ctx, network, address)
+}
+
+var loopWatchOnce sync.Once
+
+// startLoopWatch re-resolves a proxy hostname every few minutes and
+// after a failed proxy dial; if its addresses changed, the VPN routes
+// are rebuilt so the new address stays off the tunnel.
+func startLoopWatch() {
+	loopWatchOnce.Do(func() {
+		go func() {
+			t := time.NewTicker(3 * time.Minute)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+				case <-upstreamproxy.ProxyDialFailures():
+					time.Sleep(2 * time.Second) // coalesce bursts
+				}
+				cfg := upstreamproxy.Get()
+				if cfg.Enabled() && upstreamproxy.LoopPrefixesStale(cfg.Host) {
+					log.Printf("forced upstream: proxy address changed; reconfiguring")
+					reconfigureForcedVPN()
+				}
+			}
+		}()
+	})
 }

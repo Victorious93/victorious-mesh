@@ -31,6 +31,9 @@ data class KillSwitchDecision(
 )
 
 object KillSwitchPlanner {
+  /** Restart after onDestroy only if the kill switch is on and still armed. */
+  fun restartOnDestroy(cfg: KillSwitchConfig): Boolean = cfg.enabled && cfg.armed
+
   fun decide(
       enabled: Boolean,
       armed: Boolean,

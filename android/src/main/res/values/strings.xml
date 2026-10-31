@@ -442,7 +442,8 @@
     <string name="proxy_forced_enable">Force all traffic through this proxy</string>
     <string name="proxy_forced_body">Off by default. App TCP in the VPN is sent through the proxy with credentials. Public DNS uses SOCKS5 UDP ASSOCIATE or DNS over TCP. Mesh names stay on the mesh. UDP uses SOCKS5 UDP ASSOCIATE or is blocked. IPv6 goes through the proxy or is blocked — never leaked on Wi-Fi or cellular.</string>
     <string name="proxy_fail_closed">Fail closed</string>
-    <string name="proxy_fail_closed_body">If the proxy drops, block those flows instead of sending them around it. Public DNS is always fail-closed. IPv6 goes through the proxy when the upstream supports it; otherwise IPv6 is blocked and is never leaked on Wi-Fi or cellular. ICMP cannot go through SOCKS/CONNECT and is dropped.</string>
+    <string name="proxy_fail_open_warning">Warning: Fail closed is off. If the proxy goes down, app IPv4 TCP is sent directly on Wi-Fi or cellular, outside the proxy, and shows your real IP. Turn Fail closed back on to block it instead.</string>
+    <string name="proxy_fail_closed_body">On by default. If the proxy drops, block those flows instead of sending them around it. Public DNS is always fail-closed. IPv6 goes through the proxy when the upstream supports it; otherwise IPv6 is blocked and is never leaked on Wi-Fi or cellular. ICMP cannot go through SOCKS/CONNECT and is dropped.</string>
     <string name="proxy_path_heading">Forced path status</string>
     <string name="proxy_dns_heading">DNS</string>
     <string name="proxy_ipv6_heading">IPv6</string>
@@ -452,7 +453,7 @@
     <string name="proxy_dns_tcp">Through the proxy (DNS over TCP). Mesh names stay on the mesh.</string>
     <string name="proxy_dns_blocked">Blocked. The proxy is down, so public DNS is not sent on Wi-Fi or cellular.</string>
     <string name="proxy_ipv6_off">Off. Turn on Force all traffic to send IPv6 through the proxy or block it.</string>
-    <string name="proxy_ipv6_unknown">Checking. The first IPv6 flow will go through the proxy, or IPv6 will be blocked.</string>
+    <string name="proxy_ipv6_unknown">Not tested yet. IPv6 only ever goes through the proxy; if the proxy refuses it, IPv6 is blocked. It is never sent on Wi-Fi or cellular.</string>
     <string name="proxy_ipv6_via">Through the proxy.</string>
     <string name="proxy_ipv6_blocked">Blocked. This proxy does not support IPv6. It is not leaked on Wi-Fi or cellular.</string>
     <string name="proxy_upstream_host">Proxy host</string>

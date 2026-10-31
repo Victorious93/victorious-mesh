@@ -90,4 +90,11 @@ class KillSwitchPlannerTest {
     assertEquals(false, d.arm)
     assertFalse(d.holdBlackhole)
   }
+
+  @Test
+  fun restartOnDestroyNeedsEnabledAndArmed() {
+    assertTrue(KillSwitchPlanner.restartOnDestroy(KillSwitchConfig(enabled = true, armed = true)))
+    assertFalse(KillSwitchPlanner.restartOnDestroy(KillSwitchConfig(enabled = true, armed = false)))
+    assertFalse(KillSwitchPlanner.restartOnDestroy(KillSwitchConfig(enabled = false, armed = true)))
+  }
 }
