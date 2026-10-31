@@ -17,6 +17,12 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Victorious Mesh: guards IPNReceiver (connect / disconnect / exit node).
+         Signature level: only apps signed with this app's own key. -->
+    <permission
+        android:name="com.victorious.mesh.permission.CONTROL_VPN"
+        android:protectionLevel="signature" />
+
     <queries>
         <package android:name="com.victorious.launch" />
         <provider android:authorities="com.victorious.launch.theme" />
@@ -114,7 +120,8 @@
 
         <receiver
             android:name="com.tailscale.ipn.IPNReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.victorious.mesh.permission.CONTROL_VPN">
             <intent-filter>
                 <action android:name="com.tailscale.ipn.CONNECT_VPN" />
                 <action android:name="com.tailscale.ipn.DISCONNECT_VPN" />

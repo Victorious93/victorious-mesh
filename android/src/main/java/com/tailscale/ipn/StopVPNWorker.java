@@ -30,7 +30,7 @@ public final class StopVPNWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
-        UninitializedApp.get().stopVPN();
+        UninitializedApp.get().stopVPNFromExternal();
         return Result.success();
     }
 }

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Security
+- `IPNReceiver` (`CONNECT_VPN` / `DISCONNECT_VPN` / `USE_EXIT_NODE`) now
+  requires the signature permission
+  `com.victorious.mesh.permission.CONTROL_VPN`. Other apps (including
+  Tasker) can no longer stop the VPN or change the exit node.
+- An external disconnect (IPNReceiver → `StopVPNWorker`) is refused while
+  the kill switch is on and armed, so it can never disarm the kill switch.
+- Debug signing certificates (droidcommand-AI debug, Victorious Browser
+  debug, VictorLaunch debug) are trusted only when `BuildConfig.DEBUG`.
+  Release builds trust only the droidcommand-AI release cert for
+  `ai.droidcommand.app`; the release theme falls back to built-in.
+  **[not device-verified]**
+
 ### Changed
 - Gradle `namespace` is `com.victorious.mesh` (`R` / `BuildConfig`). Kotlin
   sources stay `com.tailscale.ipn` (gomobile `libtailscale` + upstream-merge
