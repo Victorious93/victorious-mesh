@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- Fleet theme: provider queries run on a background thread and are debounced; observer registration failures fall back to the built-in theme and retry (capped).
+- Leak checker: the HTTP connection is always closed, the "checking" state is always cleared, and only https sighting URLs are used.
+- Backup import: forbidden mesh-IP keys are checked on parsed JSON keys (catches escaped/nested keys; no false positives on values).
+
 ### Changed
 - Gradle `namespace` is `com.victorious.mesh` (`R` / `BuildConfig`). Kotlin
   sources stay `com.tailscale.ipn` (gomobile `libtailscale` + upstream-merge

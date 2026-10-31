@@ -249,7 +249,7 @@ The report covers this app only:
 2. Whether the kill switch is on.
 3. How many apps are set to **Direct** (those skip the tunnel on purpose).
 4. Mesh DNS on or off.
-5. A public IP from the URL in **Settings → Per-app routing** (this app's path, not another app's).
+5. A public IP from the URL in **Settings → Per-app routing** (this app's path, not another app's). The URL must be **https**; a plain `http://` URL is refused and the report says so.
 
 **Limits.** This cannot prove other apps are leak-free. WebRTC/STUN, IPv6 bypass, and sockets opened before the VPN are not tested. There is **no fleet operation** for this.
 
@@ -321,7 +321,7 @@ This page snapshots the mesh on this phone:
 
 **[not device-verified]**
 
-On start, Victorious Mesh reads `content://com.victorious.launch.theme/current` (FLEET_THEME schemaVersion 1). It also watches that URI and listens for `com.victorious.launch.action.FLEET_THEME_CHANGED`. When Don changes **Settings → Fleet theme** in VictorLaunch, this app re-queries and applies `palette.*` live.
+On start, Victorious Mesh reads `content://com.victorious.launch.theme/current` (FLEET_THEME schemaVersion 1). It also watches that URI and listens for `com.victorious.launch.action.FLEET_THEME_CHANGED`. When Don changes **Settings → Fleet theme** in VictorLaunch, this app re-queries and applies `palette.*` live. Queries run in the background (not on the main thread), and a burst of change events triggers one query. If the watcher cannot be registered for a reason other than a security refusal, the app keeps the built-in theme and retries a few times.
 
 This app **never writes** the provider. Broadcast extras are a wake-up only — they are not the theme and never authorize.
 
@@ -564,6 +564,6 @@ under **Settings → WireGuard**.
 - **Diagnostic log upload is disabled.** The app does not send diagnostic logs to a remote log server. That path is switched off in the build (always reports logging as off; remote upload cannot be turned on). Logs that the VPN core writes stay on the device.
 - **There is no in-app bug-report upload.** The old report screen is not linked from Settings, because it targeted that remote log server.
 - **Keys stay on this device.** Login and node keys are stored in encrypted app storage. Extra hardware-backed keys use the Android Keystore when the phone supports it. Auth keys you paste are handed to the local VPN engine for login; they are not written to the Control server preference. WireGuard configs, including private keys, stay in the same encrypted on-device store and are not written to logs or error messages. Optional proxy usernames and passwords use that same encrypted store. Android backup for this app is off, so those secrets are not copied to cloud backup.
-- **The fleet bridge** returns status and IP addresses only — never keys, tokens, or file contents. Mesh IP addresses are not written to logs or backups.
+- **The fleet bridge** returns status and IP addresses only — never keys, tokens, or file contents. Mesh IP addresses are not written to logs or backups. Imported backups are refused if any JSON key (at any depth) is `ipv4`, `ipv6`, `ips`, `mesh.ip` or `mesh.ip.get`; those words used as values are fine.
 - **What the intro text still says.** The first-run paragraph mentions that a name, device name, OS version, and IP are used to connect devices. That text is shown in the app; this build does not upload diagnostic logs, and your Headscale server is the control plane you configured.
 - **Licensing.** Victorious Mesh is a modified open-source client (BSD-3-Clause). Credit to the original authors belongs in the license files (`LICENSE`, `NOTICE`, `PATENTS`) and on the About screen. This app is not affiliated with or endorsed by those original authors.

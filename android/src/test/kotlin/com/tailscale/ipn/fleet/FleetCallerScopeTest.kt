@@ -146,6 +146,12 @@ class FleetCallerScopeTest {
     val cleanBackup = """{"kind":"UNIFIED_BACKUP","payload":{"controlUrl":"https://hs.example"}}"""
     assertFalse(FleetRedaction.jsonContainsBackupForbiddenKeys(cleanBackup))
     assertFalse(FleetRedaction.containsMeshAddress(cleanBackup))
+
+    // Keys are checked after JSON parsing: escaped and nested keys are caught,
+    // and a forbidden word used as a value is not a false positive.
+    assertTrue(FleetRedaction.jsonContainsBackupForbiddenKeys("""{"payload":{"IP\u0073":[]}}"""))
+    assertTrue(FleetRedaction.jsonContainsBackupForbiddenKeys("""{"a":[{"ipv6":"x"}]}"""))
+    assertFalse(FleetRedaction.jsonContainsBackupForbiddenKeys("""{"note":"ips","list":["ipv4"]}"""))
   }
 
   @Test

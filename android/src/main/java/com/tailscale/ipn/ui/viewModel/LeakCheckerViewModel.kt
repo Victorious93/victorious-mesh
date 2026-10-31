@@ -34,41 +34,63 @@ class LeakCheckerViewModel(app: Application) : AndroidViewModel(app) {
     checking.set(true)
     message.set(null)
     viewModelScope.launch(Dispatchers.IO) {
-      val secrets = EncryptedPrefsSecretStore(App.get().getEncryptedPrefs())
-      val vpnActive = App.get().getAppScopedViewModel().vpnActive.value
-      val killSwitchOn = KillSwitchStore(secrets).enabled()
-      val direct = PerAppPlanner.directPackages(PerAppStore(secrets).routes()).size
-      val corpDns = Notifier.prefs.value?.CorpDNS
-      var ip: String? = null
-      var mesh = false
-      var err: String? = null
       try {
-        val endpoint = PerAppStore(secrets).sightingEndpoint()
-        val conn = URL(endpoint).openConnection() as HttpURLConnection
+        findings.set(check())
+      } catch (e: Exception) {
+        message.set(e.javaClass.simpleName)
+      } finally {
+        // Never leave the button stuck on "checking".
+        checking.set(false)
+      }
+    }
+  }
+
+  private fun check(): List<LeakFinding> {
+    val secrets = EncryptedPrefsSecretStore(App.get().getEncryptedPrefs())
+    val vpnActive = App.get().getAppScopedViewModel().vpnActive.value
+    val killSwitchOn = KillSwitchStore(secrets).enabled()
+    val direct = PerAppPlanner.directPackages(PerAppStore(secrets).routes()).size
+    val corpDns = Notifier.prefs.value?.CorpDNS
+    var ip: String? = null
+    var mesh = false
+    var err: String? = null
+    try {
+      val endpoint = PerAppStore(secrets).sightingEndpoint()
+      if (!LeakCheckerPlanner.endpointAllowed(endpoint)) {
+        throw InsecureEndpoint()
+      }
+      val conn = URL(endpoint).openConnection() as HttpURLConnection
+      try {
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
         conn.requestMethod = "GET"
+        conn.instanceFollowRedirects = false
         val body = conn.inputStream.bufferedReader().use { it.readText() }
         val seen = IpSightingParser.parse(body)
         ip = seen.ip
         mesh = seen.ip != null && IpSightingParser.looksLikeMeshIPv4(seen.ip)
-      } catch (e: Exception) {
-        err = e.javaClass.simpleName
+      } finally {
+        conn.disconnect()
       }
-      val report =
-          LeakCheckerPlanner.report(
-              LeakInputs(
-                  vpnActive = vpnActive,
-                  killSwitchOn = killSwitchOn,
-                  directPackageCount = direct,
-                  publicIp = ip,
-                  publicIpIsMesh = mesh,
-                  sightingError = err,
-                  corpDns = corpDns,
-              )
-          )
-      findings.set(report)
-      checking.set(false)
+    } catch (_: InsecureEndpoint) {
+      err = "endpoint must use https"
+    } catch (e: Exception) {
+      err = e.javaClass.simpleName
     }
+    val report: List<LeakFinding> =
+        LeakCheckerPlanner.report(
+            LeakInputs(
+                vpnActive = vpnActive,
+                killSwitchOn = killSwitchOn,
+                directPackageCount = direct,
+                publicIp = ip,
+                publicIpIsMesh = mesh,
+                sightingError = err,
+                corpDns = corpDns,
+            )
+        )
+    return report
   }
+
+  private class InsecureEndpoint : Exception()
 }

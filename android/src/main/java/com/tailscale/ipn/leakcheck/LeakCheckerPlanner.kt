@@ -33,6 +33,12 @@ data class LeakInputs(
 )
 
 object LeakCheckerPlanner {
+  /** Only HTTPS endpoints: a plain-http answer could be forged on the path. */
+  fun endpointAllowed(url: String): Boolean =
+      runCatching { java.net.URI(url.trim()) }.getOrNull()?.let {
+        it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank()
+      } ?: false
+
   const val ID_VPN = "vpn"
   const val ID_KILLSWITCH = "killswitch"
   const val ID_DIRECT = "direct"

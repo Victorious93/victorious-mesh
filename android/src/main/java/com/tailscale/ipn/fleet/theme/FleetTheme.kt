@@ -236,6 +236,9 @@ object FleetThemeCodec {
 }
 
 object FleetThemePlanner {
+  /** Observer registration retries (non-security failures only), with a cap. */
+  fun shouldRetryRegister(attempt: Int, max: Int): Boolean = attempt in 1..max
+
   fun normalize(fp: String) = fp.replace(":", "").replace(" ", "").lowercase()
 
   fun pinnedLaunchCerts(): Set<String> =
