@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+- Kill switch: the blocking VPN is no longer dropped while a reconnect is starting; it is removed only when the real tunnel is up (mesh or WireGuard).
+- Kill switch: restart after the service dies no longer races a stale "user stopping" flag; it reads the saved armed state once and restarts through WorkManager.
+- Force all traffic: **Fail closed is now on by default** (existing installs without an explicit choice get it on, and turning forcing on re-enables it). A red warning shows when it is off.
+- Force all traffic: a proxy socket that cannot be protected from the VPN is now refused instead of used; the VPN service handle is read under a lock.
+- Force all traffic: a proxy hostname is re-resolved periodically and after proxy failures, and routes are rebuilt when its address changes.
+- Force all traffic: IPv6 UDP is refused once IPv6 is known to be blocked; the IPv6 status text says "not tested yet" instead of implying traffic might leak.
+
 ### Changed
 - Gradle `namespace` is `com.victorious.mesh` (`R` / `BuildConfig`). Kotlin
   sources stay `com.tailscale.ipn` (gomobile `libtailscale` + upstream-merge

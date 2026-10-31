@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.system.OsConstants
 import com.tailscale.ipn.killswitch.KillSwitchController
+import com.tailscale.ipn.killswitch.KillSwitchPlanner
 import com.tailscale.ipn.killswitch.KillSwitchEvent
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.proxy.MeshProxyController
@@ -49,7 +50,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       refreshMeshProxy()
     } else {
       MeshProxyController.stop(this)
-      if (!closed && !KillSwitchController.userStopping) {
+      if (!closed) {
         holdAndRestartIfArmed()
       }
     }
@@ -102,14 +103,16 @@ open class IPNService : VpnService(), libtailscale.IPNService {
         }
         ACTION_START_WIREGUARD -> {
           KillSwitchController.apply(KillSwitchEvent.USER_START, vpnRunning = false)
-          stopBlackhole()
+          // Keep the kill-switch blackhole until the new tunnel is up.
+          if (!KillSwitchController.store().enabled()) stopBlackhole()
           showForegroundNotification()
           startWireGuard(intent.getStringExtra(EXTRA_WG_PROFILE_ID))
           START_STICKY
         }
         ACTION_START_VPN -> {
           KillSwitchController.apply(KillSwitchEvent.USER_START, vpnRunning = false)
-          stopBlackhole()
+          // Keep the kill-switch blackhole until updateVpnStatus(true).
+          if (!KillSwitchController.store().enabled()) stopBlackhole()
           showForegroundNotification()
           // Mesh and WireGuard are mutually exclusive: tear WireGuard down first.
           stopWireGuard()
@@ -174,6 +177,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       try {
         Libtailscale.startWireGuard(this@IPNService, conf)
         WireGuardManager.onWireGuardStarted(profileId)
+        stopBlackhole()
         TSLog.d(TAG, "WireGuard mode up")
       } catch (e: Exception) {
         // Go errors never include key material (see libtailscale/wgtunnel.go).
@@ -208,17 +212,16 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun onDestroy() {
-    val restart =
-        KillSwitchController.store().enabled() &&
-            KillSwitchController.store().armed() &&
-            !KillSwitchController.userStopping
+    // One consistent read of the persisted state; a user stop has
+    // already disarmed it (USER_STOP/REVOKE/TOGGLE_OFF).
+    val restart = KillSwitchPlanner.restartOnDestroy(KillSwitchController.store().config())
     NetworkChangeCallback.setUnderlyingNetworkListener(null)
     stopBlackhole()
     close()
     updateVpnStatus(false)
     super.onDestroy()
     if (restart && UninitializedApp.get().isAbleToStartVPN() && KillSwitchController.shouldRestartNow()) {
-      app.startVPN()
+      KillSwitchController.scheduleRestart(applicationContext)
     }
   }
 
@@ -245,7 +248,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       establishBlackhole()
     }
     if (decision.restartVpn && KillSwitchController.shouldRestartNow()) {
-      app.startVPN()
+      KillSwitchController.scheduleRestart(applicationContext)
     }
   }
 

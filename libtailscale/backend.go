@@ -251,7 +251,7 @@ func (a *App) runBackend(ctx context.Context, hardwareAttestation bool) error {
 			// See https://github.com/tailscale/corp/issues/13814
 			b.backend.DebugRebind()
 
-			vpnService.service = s
+			setVPNService(s)
 
 			if state >= ipn.Starting && b.isConfigNonNilAndDifferent(cfg.rcfg, cfg.dcfg) {
 				if err := b.updateTUN(cfg.rcfg, cfg.dcfg); err != nil {
@@ -266,7 +266,7 @@ func (a *App) runBackend(ctx context.Context, hardwareAttestation bool) error {
 				b.CloseTUNs()
 				netns.SetAndroidProtectFunc(nil)
 				netns.SetAndroidBindToNetworkFunc(nil)
-				vpnService.service = nil
+				setVPNService(nil)
 			}
 		case i := <-onDNSConfigChanged:
 			// TODO (barnstar): Consider using [dns.Manager.RecompileDNSConfig] here.
@@ -433,5 +433,5 @@ func (a *App) closeVpnService(err error, b *backend) {
 	b.CloseTUNs()
 
 	vpnService.service.DisconnectVPN()
-	vpnService.service = nil
+	setVPNService(nil)
 }

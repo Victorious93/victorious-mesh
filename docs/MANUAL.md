@@ -169,12 +169,13 @@ This is the other direction: apps on this phone would send internet traffic thro
 
 - **HTTP on Android 10 and newer:** the VPN tells Android about that proxy (`VpnService.Builder.setHttpProxy`). That is **advisory**. Apps that ignore the system HTTP proxy do **not** go through it.
 - Username and password for an upstream proxy are stored encrypted, but Android's API has **no credential field**, so they cannot be applied.
-- If the proxy host is a **literal public or LAN IP**, Android 13+ excludes that IP from the VPN so the phone can still reach the proxy on Wi‑Fi or cellular (avoids a routing loop). A **hostname** cannot be excluded that way. A **mesh IP** upstream is left inside the VPN on purpose.
+- If the proxy host is a **literal public or LAN IP**, Android 13+ excludes that IP from the VPN so the phone can still reach the proxy on Wi‑Fi or cellular (avoids a routing loop). With **Force all traffic** on, a **hostname** is resolved and its addresses excluded too; the app re-resolves it every few minutes and after a failed proxy connection, and rebuilds the routes if the address changed. A **mesh IP** upstream is left inside the VPN on purpose.
 - **SOCKS5 (advisory):** settings are saved only unless you turn on **Force all traffic**.
 - **Force all traffic (off by default):** the mesh engine sends app TCP from the VPN through the proxy (HTTP CONNECT or SOCKS5) and applies username/password. UDP uses SOCKS5 UDP ASSOCIATE when the proxy supports it; otherwise UDP is blocked. Mesh `100.x` / `fd7a:…` addresses stay on the mesh. The proxy host is excluded from the VPN so the phone can still reach it (loop prevention). **[not device-verified]**
 - **DNS (when Force all traffic is on):** public DNS (port 53) is sent through the proxy — SOCKS5 UDP ASSOCIATE when the proxy supports it, otherwise DNS over TCP (RFC 7766) via CONNECT or SOCKS5. Mesh / MagicDNS names stay on the mesh. DNS is fail-closed: if the proxy is down, public lookups are blocked instead of going out on Wi‑Fi or cellular. The Proxy screen shows the live DNS path (waiting / UDP / TCP / blocked). **[not device-verified]**
-- **IPv6 (when Force all traffic is on):** IPv6 is sent through the proxy when the upstream supports it; otherwise IPv6 is blocked and is never leaked on the underlay. The Proxy screen shows the live IPv6 path (checking / through the proxy / blocked). **[not device-verified]**
-- **Fail closed (off by default):** if the proxy is down, those flows are blocked instead of going around it. Public DNS is always fail-closed, even when this switch is off.
+- **IPv6 (when Force all traffic is on):** IPv6 is sent through the proxy when the upstream supports it; otherwise IPv6 is blocked and is never leaked on the underlay. The Proxy screen shows the live IPv6 path (not tested yet / through the proxy / blocked). Before the first IPv6 flow it shows *not tested yet*; IPv6 still never leaves outside the proxy. **[not device-verified]**
+- **Fail closed (on by default):** if the proxy is down, those flows are blocked instead of going around it. Turning **Force all traffic** on switches it back on. If you turn it off, the Proxy screen shows a red warning: app IPv4 TCP then goes directly on Wi‑Fi or cellular whenever the proxy is unreachable. Public DNS, UDP and IPv6 are always fail-closed, even when this switch is off.
+- If the app cannot exclude its own connection to the proxy from the VPN (Android `protect` fails), that connection is refused rather than sent anyway. **[not device-verified]**
 
 **Gaps that remain.** ICMP cannot go through SOCKS/CONNECT and is dropped. Apps set to **Direct** in Per-app routing skip the VPN and this path. WireGuard mode does not use the forced path. After you change these settings, disconnect and reconnect the mesh.
 
@@ -209,7 +210,7 @@ Pick a route for each installed app. **[not device-verified]**
 
 When this is on and you have started the mesh or WireGuard, the app treats that as “the tunnel should stay up”:
 
-1. An unexpected drop (service killed, TUN closed, Always-on restart) holds a **blocking** VPN so apps cannot fall back to Wi‑Fi or cellular, then tries to reconnect.
+1. An unexpected drop (service killed, TUN closed, Always-on restart) holds a **blocking** VPN so apps cannot fall back to Wi‑Fi or cellular, then tries to reconnect. The blocking VPN stays in place while the tunnel restarts and is removed only once the real tunnel is up. Reconnects after the service is killed are scheduled through Android's job system, so they still work from the background.
 2. Turn the **main-screen switch** or the Quick Settings tile **off** to leave. That is an explicit disconnect and tears the hold down.
 3. A link opens Android’s VPN settings. **Always-on VPN** plus **Block connections without VPN** is the stronger, system-level lock. Use that if you need the OS to refuse traffic whenever this app is not the VPN.
 

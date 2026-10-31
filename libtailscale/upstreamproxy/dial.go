@@ -33,10 +33,17 @@ type Dialer struct {
 }
 
 func (d Dialer) dialProxy(ctx context.Context) DialFunc {
-	if d.Dial != nil {
-		return d.Dial
+	dial := d.Dial
+	if dial == nil {
+		dial = defaultDial
 	}
-	return defaultDial
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		c, err := dial(ctx, network, address)
+		if err != nil {
+			noteProxyDialFailed()
+		}
+		return c, err
+	}
 }
 
 func defaultDial(ctx context.Context, network, address string) (net.Conn, error) {
@@ -166,6 +173,9 @@ func (d *ctxDialer) DialContext(ctx context.Context, network, address string) (n
 func (d Dialer) DialUDP(ctx context.Context, dest netip.AddrPort) (net.PacketConn, error) {
 	if !d.Cfg.Enabled() {
 		return nil, errors.New("forced upstream is off")
+	}
+	if dest.Addr().Unmap().Is6() && IPv6State() == IPv6Blocked {
+		return nil, ErrIPv6Blocked
 	}
 	if d.Cfg.Kind != KindSOCKS5 {
 		return nil, ErrUDPNotSupported
