@@ -670,8 +670,21 @@ open class UninitializedApp : Application() {
     }
   }
 
-  fun stopVPN() {
-    val intent = Intent(this, IPNService::class.java).apply { action = IPNService.ACTION_STOP_VPN }
+  fun stopVPN() = stopVPN(external = false)
+
+  /**
+   * Stop requested by an external broadcast (IPNReceiver -> StopVPNWorker).
+   * IPNService refuses it while the kill switch is armed, so another app can
+   * never disarm the kill switch.
+   */
+  fun stopVPNFromExternal() = stopVPN(external = true)
+
+  private fun stopVPN(external: Boolean) {
+    val intent =
+        Intent(this, IPNService::class.java).apply {
+          action = IPNService.ACTION_STOP_VPN
+          putExtra(IPNService.EXTRA_EXTERNAL_STOP, external)
+        }
     try {
       startService(intent)
     } catch (illegalStateException: IllegalStateException) {
