@@ -14,7 +14,6 @@ import android.system.OsConstants
 import com.tailscale.ipn.killswitch.KillSwitchController
 import com.tailscale.ipn.killswitch.KillSwitchPlanner
 import com.tailscale.ipn.killswitch.KillSwitchEvent
-import com.tailscale.ipn.killswitch.KillSwitchPlanner
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
