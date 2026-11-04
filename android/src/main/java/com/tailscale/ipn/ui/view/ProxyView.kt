@@ -159,7 +159,8 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
             subtitle = stringResource(R.string.proxy_forced_body),
             isOn = upstream.forced,
             onToggle = { on ->
-              model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, forced = on, failClosed = upstream.failClosed)
+              // Turning forcing on re-arms fail-closed (the safe default).
+              model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, forced = on, failClosed = on || upstream.failClosed)
             },
         )
         Setting.Switch(
@@ -170,6 +171,14 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
               model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, forced = upstream.forced, failClosed = on)
             },
         )
+        if (upstream.forced && !upstream.failClosed) {
+          Text(
+              stringResource(R.string.proxy_fail_open_warning),
+              color = MaterialTheme.colorScheme.error,
+              style = MaterialTheme.typography.bodyMedium,
+              modifier = Modifier.padding(vertical = 4.dp),
+          )
+        }
         ForcedPathStatus(dnsState, ipv6State)
         TextButton(onClick = { model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed) }) {
           Text(stringResource(R.string.proxy_save_upstream))

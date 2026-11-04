@@ -31,6 +31,9 @@ data class KillSwitchDecision(
 )
 
 object KillSwitchPlanner {
+  /** Restart after onDestroy only if the kill switch is on and still armed. */
+  fun restartOnDestroy(cfg: KillSwitchConfig): Boolean = cfg.enabled && cfg.armed
+
   /**
    * A stop that came from an external broadcast (IPNReceiver) is refused while
    * the kill switch is on and armed. Only the in-app toggle, the QS tile, or
