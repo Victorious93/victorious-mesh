@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Security
+- `IPNReceiver` (`CONNECT_VPN` / `DISCONNECT_VPN` / `USE_EXIT_NODE`) now
+  requires the signature permission
+  `com.victorious.mesh.permission.CONTROL_VPN`. Other apps (including
+  Tasker) can no longer stop the VPN or change the exit node.
+- An external disconnect (IPNReceiver → `StopVPNWorker`) is refused while
+  the kill switch is on and armed, so it can never disarm the kill switch.
+- Debug signing certificates (droidcommand-AI debug, Victorious Browser
+  debug, VictorLaunch debug) are trusted only when `BuildConfig.DEBUG`.
+  Release builds trust only the droidcommand-AI release cert for
+  `ai.droidcommand.app`; the release theme falls back to built-in.
+  **[not device-verified]**
+
 ### Fixed
 - Fleet theme: provider queries run on a background thread and are debounced; observer registration failures fall back to the built-in theme and retry (capped).
 - Leak checker: the HTTP connection is always closed, the "checking" state is always cleared, and only https sighting URLs are used.

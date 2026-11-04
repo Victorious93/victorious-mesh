@@ -31,6 +31,13 @@ data class KillSwitchDecision(
 )
 
 object KillSwitchPlanner {
+  /**
+   * A stop that came from an external broadcast (IPNReceiver) is refused while
+   * the kill switch is on and armed. Only the in-app toggle, the QS tile, or
+   * the notification (explicit user stops) may disarm it.
+   */
+  fun refuseExternalStop(enabled: Boolean, armed: Boolean): Boolean = enabled && armed
+
   fun decide(
       enabled: Boolean,
       armed: Boolean,

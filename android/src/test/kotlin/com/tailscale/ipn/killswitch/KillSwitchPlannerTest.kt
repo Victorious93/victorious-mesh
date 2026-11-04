@@ -90,4 +90,12 @@ class KillSwitchPlannerTest {
     assertEquals(false, d.arm)
     assertFalse(d.holdBlackhole)
   }
+
+  @Test
+  fun externalStopRefusedOnlyWhileArmed() {
+    assertTrue(KillSwitchPlanner.refuseExternalStop(enabled = true, armed = true))
+    assertFalse(KillSwitchPlanner.refuseExternalStop(enabled = true, armed = false))
+    assertFalse(KillSwitchPlanner.refuseExternalStop(enabled = false, armed = true))
+    assertFalse(KillSwitchPlanner.refuseExternalStop(enabled = false, armed = false))
+  }
 }
