@@ -238,14 +238,24 @@ object FleetThemeCodec {
 object FleetThemePlanner {
   fun normalize(fp: String) = fp.replace(":", "").replace(" ", "").lowercase()
 
-  fun pinnedLaunchCerts(): Set<String> =
-      setOf(normalize(FleetThemeContract.LAUNCH_DEBUG_CERT))
+  /**
+   * The VictorLaunch debug cert is from a public debug keystore, so it is only
+   * pinned in debug builds. Release has no VictorLaunch release pin yet, so a
+   * release build always uses the built-in theme.
+   */
+  fun pinnedLaunchCerts(debug: Boolean = com.victorious.mesh.BuildConfig.DEBUG): Set<String> =
+      if (debug) setOf(normalize(FleetThemeContract.LAUNCH_DEBUG_CERT)) else emptySet()
 
-  fun providerTrusted(packageName: String?, certs: List<String>): Boolean {
+  fun providerTrusted(
+      packageName: String?,
+      certs: List<String>,
+      debug: Boolean = com.victorious.mesh.BuildConfig.DEBUG,
+  ): Boolean {
     if (packageName != FleetThemeContract.PACKAGE_LAUNCH) return false
     if (certs.isEmpty()) return false
     val incoming = certs.map { normalize(it) }.toSet()
-    return incoming.any { it in pinnedLaunchCerts() }
+    val pins = pinnedLaunchCerts(debug)
+    return incoming.any { it in pins }
   }
 
   fun decide(query: FleetThemeQuery): FleetThemeDecision {
