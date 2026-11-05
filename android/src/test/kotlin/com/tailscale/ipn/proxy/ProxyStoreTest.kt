@@ -29,7 +29,8 @@ class ProxyStoreTest {
     assertEquals(UpstreamKind.NONE, s.upstream().kind)
     assertEquals(DEFAULT_UPSTREAM_PORT, s.upstream().port)
     assertFalse(s.upstream().forced)
-    assertFalse(s.upstream().failClosed)
+    // Fail-closed is the default for forced mode.
+    assertTrue(s.upstream().failClosed)
   }
 
   @Test
@@ -85,5 +86,12 @@ class ProxyStoreTest {
     assertFalse(again.enabled)
     assertEquals(9090, again.port)
     assertEquals("a", again.username)
+  }
+
+  @Test
+  fun failClosedOffIsRemembered() {
+    val s = ProxyStore(MapStore())
+    s.saveUpstream(UpstreamProxyConfig(kind = UpstreamKind.SOCKS5, host = "203.0.113.5", port = 1080, forced = true, failClosed = false))
+    assertFalse(s.upstream().failClosed)
   }
 }

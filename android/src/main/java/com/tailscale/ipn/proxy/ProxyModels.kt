@@ -28,7 +28,7 @@ data class UpstreamProxyConfig(
     val username: String = "",
     val password: String = "",
     val forced: Boolean = false,
-    val failClosed: Boolean = false,
+    val failClosed: Boolean = true,
 ) {
   override fun toString(): String =
       "UpstreamProxyConfig(kind=$kind, host=$host, port=$port, username=${username.isNotEmpty()}, password=***, forced=$forced, failClosed=$failClosed)"
@@ -63,7 +63,8 @@ class ProxyStore(private val store: SecretStore) {
           username = store.get(KEY_UP_USER).orEmpty(),
           password = store.get(KEY_UP_PASS).orEmpty(),
           forced = store.get(KEY_UP_FORCED) == "1",
-          failClosed = store.get(KEY_UP_FAILCLOSED) == "1",
+          // Unset means ON: forced mode fails closed unless the user turns it off.
+          failClosed = store.get(KEY_UP_FAILCLOSED) != "0",
       )
 
   fun saveUpstream(cfg: UpstreamProxyConfig) {
