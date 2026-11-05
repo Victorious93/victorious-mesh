@@ -11,7 +11,8 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
+import android.os.SystemClock
 import com.tailscale.ipn.util.TSLog
 import java.security.MessageDigest
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,17 @@ object FleetThemeClient {
   val snapshot: StateFlow<FleetThemeSnapshot> = _snapshot
 
   @Volatile private var observer: ContentObserver? = null
+  @Volatile private var registerAttempts = 0
+
+  private const val DEBOUNCE_MS = 250L
+  private const val RETRY_MS = 30_000L
+  private const val MAX_REGISTER_ATTEMPTS = 5
+
+  /** Provider queries and package lookups run here, never on the main thread. */
+  private val worker: Handler by lazy {
+    Handler(HandlerThread("fleet-theme").apply { start() }.looper)
+  }
+  private val refreshToken = Any()
 
   @Synchronized
   fun start(context: Context) {
@@ -38,7 +50,7 @@ object FleetThemeClient {
     refresh(app)
     if (observer != null) return
     val obs =
-        object : ContentObserver(Handler(Looper.getMainLooper())) {
+        object : ContentObserver(worker) {
           override fun onChange(selfChange: Boolean) {
             refresh(app)
           }
@@ -50,12 +62,20 @@ object FleetThemeClient {
     try {
       app.contentResolver.registerContentObserver(uri, true, obs)
       observer = obs
+      registerAttempts = 0
     } catch (e: SecurityException) {
       TSLog.d(TAG, "theme observer refused: ${e.javaClass.simpleName}")
       applyFallback(FleetThemeFallbackReason.SECURITY_EXCEPTION)
     } catch (e: Exception) {
       TSLog.d(TAG, "theme observer not registered: ${e.javaClass.simpleName}")
+      applyFallback(FleetThemeFallbackReason.PROVIDER_MISSING)
+      scheduleRegisterRetry(app)
     }
+  }
+
+  private fun scheduleRegisterRetry(app: Context) {
+    if (!FleetThemePlanner.shouldRetryRegister(++registerAttempts, MAX_REGISTER_ATTEMPTS)) return
+    worker.postDelayed({ start(app) }, RETRY_MS * registerAttempts)
   }
 
   @Synchronized
@@ -65,8 +85,15 @@ object FleetThemeClient {
     observer = null
   }
 
+  /** Debounced, off the main thread: bursts of change events cause one query. */
   fun refresh(context: Context) {
-    _snapshot.value = snapshotOrBuiltin(read(context.applicationContext))
+    val app = context.applicationContext
+    worker.removeCallbacksAndMessages(refreshToken)
+    worker.postAtTime({ refreshNow(app) }, refreshToken, SystemClock.uptimeMillis() + DEBOUNCE_MS)
+  }
+
+  private fun refreshNow(context: Context) {
+    _snapshot.value = snapshotOrBuiltin(read(context))
   }
 
   internal fun read(context: Context): FleetThemeDecision {

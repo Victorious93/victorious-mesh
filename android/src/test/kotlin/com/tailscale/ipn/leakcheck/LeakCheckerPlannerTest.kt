@@ -86,4 +86,12 @@ class LeakCheckerPlannerTest {
     assertEquals(LeakSeverity.WARN, finding(r, LeakCheckerPlanner.ID_SIGHTING).severity)
     assertEquals(LeakSeverity.WARN, finding(r, LeakCheckerPlanner.ID_DNS).severity)
   }
+
+  @Test
+  fun onlyHttpsSightingEndpoints() {
+    org.junit.Assert.assertTrue(LeakCheckerPlanner.endpointAllowed("https://ipinfo.io/json"))
+    org.junit.Assert.assertFalse(LeakCheckerPlanner.endpointAllowed("http://ipinfo.io/json"))
+    org.junit.Assert.assertFalse(LeakCheckerPlanner.endpointAllowed("ipinfo.io/json"))
+    org.junit.Assert.assertFalse(LeakCheckerPlanner.endpointAllowed("https://"))
+  }
 }

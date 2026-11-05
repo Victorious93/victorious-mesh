@@ -16,6 +16,9 @@
   **[not device-verified]**
 
 ### Fixed
+- Fleet theme: provider queries run on a background thread and are debounced; observer registration failures fall back to the built-in theme and retry (capped).
+- Leak checker: the HTTP connection is always closed, the "checking" state is always cleared, and only https sighting URLs are used.
+- Backup import: forbidden mesh-IP keys are checked on parsed JSON keys (catches escaped/nested keys; no false positives on values).
 - Kill switch: the blocking VPN is no longer dropped while a reconnect is starting; it is removed only when the real tunnel is up (mesh or WireGuard).
 - Kill switch: restart after the service dies no longer races a stale "user stopping" flag; it reads the saved armed state once and restarts through WorkManager.
 - Force all traffic: **Fail closed is now on by default** (existing installs without an explicit choice get it on, and turning forcing on re-enables it). A red warning shows when it is off.
