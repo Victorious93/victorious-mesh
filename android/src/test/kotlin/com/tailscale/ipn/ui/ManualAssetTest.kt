@@ -155,6 +155,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun connectionLogIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Connection log"))
+    assertTrue(text.contains("never part of a settings backup"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

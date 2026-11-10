@@ -275,6 +275,25 @@ When this is on and you have started the mesh or WireGuard, the app treats that 
 
 **Limits.** Another app taking the VPN slot (`onRevoke`) cannot be held — the system gives that app the interface. Apps set to **Direct** in Per-app routing still bypass. The blackhole uses documentation addresses (`192.0.2.1` / `2001:db8::1`) and is replaced when the real tunnel comes back. IPv6 hold can fail on some devices. There is **no fleet operation** for this.
 
+### Connection log
+
+**Settings → Connection log.** Off by default. **[not device-verified]**
+
+When **Keep a connection log** is on, the phone keeps a private list of:
+
+- connects, disconnects, and unexpected drops;
+- exit node changes (by device name);
+- forced-proxy on/off (type only, such as SOCKS5);
+- kill switch turned on/off, armed/disarmed, holding traffic, and released.
+
+Each line shows the time, the kind of event, and a short note. **Copy** puts the list on the clipboard; **Clear** deletes it. Turning the log off stops new entries and keeps the old ones until you clear them.
+
+**Size.** Only the newest 500 entries are kept, and never more than 64 KB. The same event repeated within 3 seconds is written once.
+
+**Privacy.** Entries never contain IP addresses (mesh IPs are redacted the same way fleet backups are, and any other IP is redacted too), proxy hosts, or passwords. The log is stored in the app's no-backup folder and is **never part of a settings backup**. Logging can never block or change a connection, the kill switch, or routing; if writing fails, the event is just skipped.
+
+There is **no fleet operation** for reading this log (a `log.connections.get` op could be proposed to the Fleet Orchestrator).
+
 ### Auto-connect
 
 ![Auto-connect](images/manual/auto-connect.png)

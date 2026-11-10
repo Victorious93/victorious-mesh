@@ -175,6 +175,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.connlog_title,
+          subtitle = stringResource(R.string.connlog_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("connectionLog") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.victorgps_title,
           subtitle = stringResource(R.string.victorgps_settings_subtitle),
           onClick = settingsNav.onNavigateToVictorGps,

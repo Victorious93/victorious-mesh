@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn
 
+import com.tailscale.ipn.connlog.ConnectionLogger
+import com.tailscale.ipn.connlog.LogKind
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -50,6 +52,9 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
   override fun updateVpnStatus(status: Boolean) {
     app.getAppScopedViewModel().setVpnActive(status)
+    ConnectionLogger.log(
+        if (status) LogKind.CONNECT else LogKind.DISCONNECT,
+        if (status) "Connected to the mesh" else if (closed) "Disconnected" else "Connection dropped")
     if (status) {
       stopBlackhole()
       refreshMeshProxy()
@@ -79,6 +84,23 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     scope.launch {
       Notifier.prefs.collect {
         if (!closed && !WireGuardManager.isWireGuardActive()) PerAppController.sync(this@IPNService)
+      }
+    }
+    // Connection log (off by default): exit node changes, by name only.
+    scope.launch {
+      var last: String? = null
+      var first = true
+      Notifier.prefs.collect { p ->
+        val id = p?.ExitNodeID?.takeIf { it.isNotEmpty() }
+        if (p != null && !first && id != last) {
+          val name =
+              id?.let { sid -> Notifier.netmap.value?.Peers?.firstOrNull { it.StableID == sid }?.displayName } ?: "a device"
+          ConnectionLogger.log(LogKind.EXIT_NODE, if (id == null) "Exit node off" else "Exit node: $name")
+        }
+        if (p != null) {
+          last = id
+          first = false
+        }
       }
     }
     // Push the saved per-app table before the first tunnel is built so a
@@ -324,12 +346,14 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       }
       blackholeFd = b.establish()
       TSLog.d(TAG, "kill-switch blackhole established")
+      if (blackholeFd != null) ConnectionLogger.log(LogKind.KILL_SWITCH, "Kill switch holding traffic (mesh down)")
     } catch (e: Exception) {
       TSLog.e(TAG, "kill-switch blackhole failed: ${e.message}")
     }
   }
 
   private fun stopBlackhole() {
+    if (blackholeFd != null) ConnectionLogger.log(LogKind.KILL_SWITCH, "Kill switch released")
     try {
       blackholeFd?.close()
     } catch (_: Exception) {}

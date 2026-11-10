@@ -17,6 +17,8 @@ import androidx.core.app.NotificationManagerCompat
 import com.tailscale.ipn.App
 import com.tailscale.ipn.MainActivity
 import com.tailscale.ipn.NetworkChangeCallback
+import com.tailscale.ipn.connlog.ConnectionLogger
+import com.tailscale.ipn.connlog.LogKind
 import com.tailscale.ipn.tiles.ExtraTilesController
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
@@ -120,6 +122,7 @@ object MeshProxyController {
         }
     try {
       Libtailscale.setForcedUpstream(kind, cfg.host, cfg.port, cfg.username, cfg.password, cfg.failClosed)
+      noteForced(if (kind == "http") "HTTP" else "SOCKS5")
     } catch (e: Exception) {
       TSLog.e(TAG, "forced upstream: ${e.message}")
       clearForced()
@@ -128,12 +131,25 @@ object MeshProxyController {
     runCatching { NetworkChangeCallback.reapplyDns("forcedProxy") }
   }
 
+  @Volatile private var lastForced: String? = null
+
+  /** Connection log (off by default): forced-proxy changes, without host or credentials. */
+  private fun noteForced(state: String) {
+    val prev = lastForced
+    lastForced = state
+    if (prev == null && state == "off") return
+    if (prev != state) {
+      ConnectionLogger.log(LogKind.PROXY, if (state == "off") "Forced proxy off" else "Forced proxy on ($state)")
+    }
+  }
+
   fun clearForced() {
     try {
       Libtailscale.clearForcedUpstream()
     } catch (_: Exception) {
     }
     runCatching { NetworkChangeCallback.reapplyDns("forcedProxyOff") }
+    noteForced("off")
   }
 
   fun forcedDNSState(): ForcedDNSStatus =

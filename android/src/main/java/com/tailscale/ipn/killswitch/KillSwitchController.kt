@@ -10,6 +10,8 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.tailscale.ipn.StartVPNWorker
+import com.tailscale.ipn.connlog.ConnectionLogger
+import com.tailscale.ipn.connlog.LogKind
 import com.tailscale.ipn.util.TSLog
 
 /** Applies [KillSwitchPlanner] to the persisted store. Off by default. */
@@ -25,7 +27,14 @@ object KillSwitchController {
   fun apply(event: KillSwitchEvent, vpnRunning: Boolean): KillSwitchDecision {
     val s = store()
     val decision = KillSwitchPlanner.decide(s.enabled(), s.armed(), vpnRunning, event)
+    val wasArmed = s.armed()
     decision.arm?.let { s.setArmed(it) }
+    when {
+      event == KillSwitchEvent.TOGGLE_ON -> ConnectionLogger.log(LogKind.KILL_SWITCH, "Kill switch turned on")
+      event == KillSwitchEvent.TOGGLE_OFF -> ConnectionLogger.log(LogKind.KILL_SWITCH, "Kill switch turned off")
+      decision.arm == true && !wasArmed -> ConnectionLogger.log(LogKind.KILL_SWITCH, "Kill switch armed")
+      decision.arm == false && wasArmed -> ConnectionLogger.log(LogKind.KILL_SWITCH, "Kill switch disarmed")
+    }
     TSLog.d(TAG, "${event.name}: ${decision.reason}")
     return decision
   }
