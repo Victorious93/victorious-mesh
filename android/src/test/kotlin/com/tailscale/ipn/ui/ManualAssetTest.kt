@@ -117,6 +117,16 @@ class ManualAssetTest {
   }
 
   @Test
+  fun perAppExitAndProxyIsDocumented() {
+    val stream = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)
+    assertNotNull(stream)
+    val text = stream!!.bufferedReader().use { it.readText() }
+    assertTrue("per-app section heading", text.contains("#### Per-app exit and proxy (off by default)"))
+    assertTrue("one exit node limit", text.contains("One exit node per phone at a time"))
+    assertTrue("fail-closed default", text.contains("**Block an app if its path is down** is **on by default**"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

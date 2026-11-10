@@ -177,7 +177,7 @@ This is the other direction: apps on this phone would send internet traffic thro
 - **Fail closed (on by default):** if the proxy is down, those flows are blocked instead of going around it. Turning **Force all traffic** on switches it back on. If you turn it off, the Proxy screen shows a red warning: app IPv4 TCP then goes directly on Wi‑Fi or cellular whenever the proxy is unreachable. Public DNS, UDP and IPv6 are always fail-closed, even when this switch is off.
 - If the app cannot exclude its own connection to the proxy from the VPN (Android `protect` fails), that connection is refused rather than sent anyway. **[not device-verified]**
 
-**Gaps that remain.** ICMP cannot go through SOCKS/CONNECT and is dropped. Apps set to **Direct** in Per-app routing skip the VPN and this path. WireGuard mode does not use the forced path. After you change these settings, disconnect and reconnect the mesh.
+**Gaps that remain.** ICMP cannot go through SOCKS/CONNECT and is dropped. Apps set to **Direct** in Per-app routing skip the VPN and this path. With per-app exit and proxy on, an app with its own Proxy or a matching Exit node choice uses that instead of the forced proxy. WireGuard mode does not use the forced path. After you change these settings, disconnect and reconnect the mesh.
 
 ### Per-app routing
 
@@ -190,13 +190,38 @@ This is the other direction: apps on this phone would send internet traffic thro
 Pick a route for each installed app. **[not device-verified]**
 
 1. **Direct** — that app skips the VPN (Wi‑Fi or cellular).
-2. **Mesh only** — that app uses this phone's mesh tunnel.
-3. **Exit node** — you can pick a Headscale exit node to remember, but Android has **one** VPN. The exit node is device-wide. The app still uses the same tunnel as Mesh only.
-4. **Upstream proxy** — remembered only. The proxy in **Settings → Proxy** is device-wide.
+2. **Normal route** — that app uses the phone's normal path: the forced proxy if **Force all traffic** is on, otherwise the phone's exit node if one is on, otherwise straight out.
+3. **Exit node** — send that app out through a Headscale exit node.
+4. **Proxy** — send that app through one saved proxy (or the one in **Settings → Proxy**).
 
-**What IP and country sites see** fetches a public IP (and country if the JSON has one) from a URL you set, on demand only. The request is made by Victorious Mesh itself, so it shows *this* app's path, not the other app's Direct path.
+#### Per-app exit and proxy (off by default)
 
-**Limits.** One tunnel cannot give each app a different exit node or proxy. Per-app traffic totals are not tracked (that would need a usage-access permission this screen does not ask for). No GPS spoofing (VictorSpoof owns that). MDM split-tunnel lists still win over these choices. There is **no fleet operation** for this.
+Exit node and Proxy choices are only **saved** until you turn on **Use per-app exit and proxy choices** at the top of the screen. With it off, nothing changes: every app (except Direct ones) uses the normal route. **[not device-verified]**
+
+When it is on:
+
+- For every new connection, the app that opened it is looked up (Android 10 or newer; the switch is greyed out on older phones) and the connection goes down that app's path.
+- **Proxy** apps go through their own saved proxy (SOCKS5 or HTTP CONNECT, with optional username and password). Different apps can use different proxies at the same time. UDP needs a SOCKS5 proxy; public DNS (port 53) from that app goes through its proxy too.
+- **Exit node** apps go out through the exit node they picked **only if it is the phone's current exit node**. Android gives the VPN a single tunnel and the mesh picks one exit node for the whole phone, so two apps cannot use two different exit nodes at once. An app that picked the current exit node still uses it even while **Force all traffic** sends everything else through a proxy.
+- Apps with an Exit node or Proxy choice are kept inside the VPN even if the split-tunnel list would leave them out. MDM lists still win.
+- **Block an app if its path is down** is **on by default**. Then an app whose proxy cannot be reached, whose exit node is not the current one, or whose proxy was deleted gets **no internet** instead of leaking around its choice. If you turn it off, that app falls back to the normal route (or goes direct when its proxy is down) and a red warning shows.
+- To catch Proxy apps, the VPN takes all internet traffic. Apps on the normal route with no exit node and no forced proxy are then relayed straight out by the app (TCP and UDP only).
+- **Saved proxies** are kept encrypted on this phone and are never put in config backups.
+
+**Limits (per-app exit and proxy).**
+
+- One exit node per phone at a time. A different exit node per app is not possible inside one Android VPN. **[Certain]**
+- Ping and other traffic without ports cannot be matched to an app. While any app is set to block on failure, that traffic to the internet is dropped; otherwise it follows the normal route. **[Certain]**
+- Lookups that Android answers for an app (normal name lookups through the phone's resolver) are made by the system, not by the app, so they follow the normal route or the mesh DNS, not that app's proxy. The connections themselves still go through the proxy. **[Likely]**
+- If Android cannot say which app owns a connection, that connection is dropped while blocking is on, and follows the normal route when it is off. The screen shows how many connections could not be matched. **[Likely]**
+- Apps on the normal route lose ping to the internet while a Proxy app is set and no exit node or forced proxy is on. **[Likely]**
+- The first packet of each new connection waits for the app lookup, which may add a little delay. **[Guessing]**
+- WireGuard mode does not use per-app exit and proxy choices.
+- After you change these settings the VPN reconnects by itself when an app moves in or out of the tunnel.
+
+**What IP and country sites see** fetches a public IP (and country if the JSON has one) from a URL you set, on demand only. The request is made by Victorious Mesh itself, so it shows *this* app's path, not the other app's path.
+
+**Limits.** Per-app traffic totals are not tracked (that would need a usage-access permission this screen does not ask for). No GPS spoofing (VictorSpoof owns that). MDM split-tunnel lists still win over these choices. There is **no fleet operation** for this.
 
 ### Kill switch
 

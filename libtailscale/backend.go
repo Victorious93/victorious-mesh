@@ -409,6 +409,12 @@ func (a *App) watchFileOpsChanges() {
 }
 
 func (b *backend) isConfigNonNilAndDifferent(rcfg *router.Config, dcfg *dns.OSConfig) bool {
+	if rcfg != nil && forceTUNRebuild.Swap(false) {
+		// Forced proxy or per-app routing changed: the routes and TUN
+		// wrapper depend on Go-side state the engine config cannot see.
+		b.logger.Logf("isConfigNonNilAndDifferent: rebuild requested by forced/per-app routing")
+		return true
+	}
 	if reflect.DeepEqual(rcfg, b.lastCfg) && reflect.DeepEqual(dcfg, b.lastDNSCfg) {
 		b.logger.Logf("isConfigNonNilAndDifferent: no change to Routes or DNS, ignore")
 		return false

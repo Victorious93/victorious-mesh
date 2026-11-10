@@ -5,6 +5,7 @@ package com.tailscale.ipn
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.net.Network
 import android.net.ProxyInfo
 import android.net.VpnService
@@ -17,6 +18,7 @@ import com.tailscale.ipn.killswitch.KillSwitchEvent
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
+import com.tailscale.ipn.routing.PerAppController
 import com.tailscale.ipn.routing.PerAppPlanner
 import com.tailscale.ipn.routing.PerAppStore
 import com.tailscale.ipn.wireguard.EncryptedPrefsSecretStore
@@ -24,6 +26,8 @@ import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
 import com.tailscale.ipn.wireguard.WireGuardManager
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +72,38 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       Notifier.netmap.collect {
         if (!closed) refreshMeshProxy()
       }
+    }
+    // Per-app exit choices depend on the phone's current exit node.
+    scope.launch {
+      Notifier.prefs.collect {
+        if (!closed && !WireGuardManager.isWireGuardActive()) PerAppController.sync(this@IPNService)
+      }
+    }
+    // Push the saved per-app table before the first tunnel is built so a
+    // cold start does not open a window on the default route.
+    if (!WireGuardManager.isWireGuardActive()) PerAppController.sync(this)
+  }
+
+  /**
+   * Which app owns a TCP/UDP connection on the tunnel (per-app exit/proxy
+   * routing). Android 10+ only; -1 when unknown.
+   */
+  override fun connectionOwnerUid(
+      proto: Int,
+      srcIP: String,
+      srcPort: Int,
+      dstIP: String,
+      dstPort: Int,
+  ): Int {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return -1
+    return try {
+      val cm = getSystemService(ConnectivityManager::class.java) ?: return -1
+      // Literal IPs only: getByName does not do a DNS lookup for these.
+      val local = InetSocketAddress(InetAddress.getByName(srcIP), srcPort)
+      val remote = InetSocketAddress(InetAddress.getByName(dstIP), dstPort)
+      cm.getConnectionOwnerUid(proto, local, remote)
+    } catch (e: Exception) {
+      -1
     }
   }
 
@@ -397,6 +433,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
               allowSelected = allowPackages,
               directPackages = PerAppStore(EncryptedPrefsSecretStore(app.getEncryptedPrefs())).routes()
                   .let { PerAppPlanner.directPackages(it) },
+              capturedPackages = PerAppController.capturedPackages(),
           )
       packagesList = perApp.packages
       allowPackages = perApp.allowPackages
@@ -430,9 +467,11 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     if (WireGuardManager.isWireGuardActive()) {
       MeshProxyController.stop(this)
       MeshProxyController.clearForced()
+      PerAppController.clear()
     } else {
       MeshProxyController.sync(this)
       MeshProxyController.syncForced(this)
+      PerAppController.sync(this)
     }
   }
 

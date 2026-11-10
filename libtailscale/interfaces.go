@@ -108,6 +108,12 @@ type IPNService interface {
 	DisconnectVPN()
 
 	UpdateVpnStatus(bool)
+
+	// ConnectionOwnerUid returns the Android uid that owns a TCP (6) or
+	// UDP (17) connection seen on the tunnel, or -1 if unknown. Backed
+	// by ConnectivityManager.getConnectionOwnerUid (Android 10+). Used
+	// only by per-app exit/proxy routing.
+	ConnectionOwnerUid(proto int32, srcIP string, srcPort int32, dstIP string, dstPort int32) int32
 }
 
 // VPNServiceBuilder corresponds to Android's VpnService.Builder.

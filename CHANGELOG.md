@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+- Per-app exit node and proxy choice (**off by default**): in
+  Settings → Per-app routing, each app can use the normal route, the
+  phone's exit node, its own saved proxy, or Direct. The owning app of each
+  new connection is found with `getConnectionOwnerUid` (Android 10+) and the
+  flow is sent to the mesh engine, its proxy (SOCKS5 / HTTP CONNECT), a
+  direct relay, or dropped. "Block an app if its path is down" is on by
+  default. Saved proxies are stored encrypted and never backed up. Only one
+  exit node per phone can be used at a time; an app that picks a different
+  one is blocked (or uses the normal route when blocking is off).
+  **[not device-verified]**
+
 ### Security
 - `IPNReceiver` (`CONNECT_VPN` / `DISCONNECT_VPN` / `USE_EXIT_NODE`) now
   requires the signature permission

@@ -8,10 +8,12 @@ import (
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"net/netip"
 
+	"github.com/tailscale/tailscale-android/libtailscale/perapp"
 	"github.com/tailscale/tailscale-android/libtailscale/upstreamproxy"
 	"tailscale.com/wgengine/router"
 )
@@ -63,7 +65,12 @@ func ForcedIPv6State() string {
 
 var forcedReconfigure func() error
 
+// forceTUNRebuild makes the next non-nil router config rebuild the TUN
+// even when the engine's own config did not change.
+var forceTUNRebuild atomic.Bool
+
 func reconfigureForcedVPN() {
+	forceTUNRebuild.Store(true)
 	if fn := forcedReconfigure; fn != nil {
 		if err := fn(); err != nil {
 			log.Printf("forced upstream: reconfigure: %v", err)
@@ -75,8 +82,18 @@ func applyForcedRoutes(rcfg *router.Config) *router.Config {
 	if rcfg == nil {
 		return nil
 	}
+	perAppClassifier.SetMeshRoutes(rcfg.Routes)
 	cfg := upstreamproxy.Get()
 	if !cfg.Enabled() {
+		if perapp.Get().NeedsCapture() {
+			// Per-app proxies/blocks: take all internet traffic so the
+			// chosen apps cannot slip past the tunnel. Apps on the
+			// default route are relayed out directly (or via the exit
+			// node) by the forced TUN wrapper.
+			next := *rcfg
+			next.Routes = append(append([]netip.Prefix(nil), rcfg.Routes...), upstreamproxy.DefaultRoutes()...)
+			return &next
+		}
 		return rcfg
 	}
 	next := *rcfg
