@@ -20,8 +20,11 @@ data class AppRoute(
     val pkg: String,
     val kind: AppRouteKind = AppRouteKind.MESH,
     val exitNodeId: String = "",
+    /** Saved proxy id for UPSTREAM_PROXY; empty means the Settings → Proxy upstream. */
+    val proxyId: String = "",
 ) {
-  override fun toString(): String = "AppRoute(pkg=$pkg, kind=$kind, exitNodeId=${exitNodeId.isNotEmpty()})"
+  override fun toString(): String =
+      "AppRoute(pkg=$pkg, kind=$kind, exitNodeId=${exitNodeId.isNotEmpty()}, proxyId=${proxyId.isNotEmpty()})"
 }
 
 data class VpnPackagePlan(
@@ -46,6 +49,8 @@ data class PublicSighting(
 const val DEFAULT_SIGHTING_ENDPOINT = "https://ipinfo.io/json"
 const val ROUTES_KEY = "perapp.routes"
 const val ENDPOINT_KEY = "perapp.sighting.endpoint"
+const val ENFORCE_KEY = "perapp.enforce"
+const val PERAPP_FAILCLOSED_KEY = "perapp.failclosed"
 
 class PerAppStore(private val store: SecretStore) {
   private val json = Json { ignoreUnknownKeys = true }
@@ -67,6 +72,20 @@ class PerAppStore(private val store: SecretStore) {
   }
 
   fun routeFor(pkg: String): AppRoute = routes().firstOrNull { it.pkg == pkg } ?: AppRoute(pkg)
+
+  /** True per-app exit/proxy enforcement. Off by default. */
+  fun enforce(): Boolean = store.get(ENFORCE_KEY) == "1"
+
+  fun setEnforce(on: Boolean) {
+    store.put(ENFORCE_KEY, if (on) "1" else "0")
+  }
+
+  /** Block an app when its chosen path is unavailable. Unset means ON. */
+  fun failClosed(): Boolean = store.get(PERAPP_FAILCLOSED_KEY) != "0"
+
+  fun setFailClosed(on: Boolean) {
+    store.put(PERAPP_FAILCLOSED_KEY, if (on) "1" else "0")
+  }
 
   fun sightingEndpoint(): String = store.get(ENDPOINT_KEY)?.ifBlank { null } ?: DEFAULT_SIGHTING_ENDPOINT
 
@@ -106,23 +125,39 @@ object PerAppPlanner {
   fun directPackages(routes: List<AppRoute>): List<String> =
       routes.filter { applied(it).applied == AppRouteKind.DIRECT }.map { it.pkg }.distinct()
 
+  /**
+   * [capturedPackages] are apps with an enforced per-app exit/proxy/block
+   * choice. They must be inside the tunnel or their choice could not be
+   * applied, so they win over the split-tunnel list. Empty (the default)
+   * keeps the old behavior.
+   */
   fun mergeSplitTunnel(
       splitSelected: List<String>,
       allowSelected: Boolean,
       directPackages: List<String>,
+      capturedPackages: List<String> = emptyList(),
   ): VpnPackagePlan {
     val direct = directPackages.filter { it.isNotBlank() }.distinct()
+    val captured = capturedPackages.filter { it.isNotBlank() }.distinct() - direct.toSet()
     return if (allowSelected) {
+      val base = (splitSelected - direct.toSet()).distinct()
+      // An empty include list means "all apps", which already covers them.
+      val packages = if (base.isEmpty()) base else (base + captured).distinct()
       VpnPackagePlan(
-          packages = (splitSelected - direct.toSet()).distinct(),
+          packages = packages,
           allowPackages = true,
-          reason = "include-mode split tunnel minus Direct apps",
+          reason =
+              if (captured.isNotEmpty() && base.isNotEmpty())
+                  "include-mode split tunnel minus Direct apps, plus per-app routed apps"
+              else "include-mode split tunnel minus Direct apps",
       )
     } else {
       VpnPackagePlan(
-          packages = (splitSelected + direct).distinct(),
+          packages = (splitSelected - captured.toSet() + direct).distinct(),
           allowPackages = false,
-          reason = "exclude-mode: Direct apps skip the VPN",
+          reason =
+              if (captured.any { it in splitSelected }) "exclude-mode: Direct apps skip the VPN; per-app routed apps kept in"
+              else "exclude-mode: Direct apps skip the VPN",
       )
     }
   }

@@ -32,15 +32,24 @@ const nicID = 1
 // Stack is a userspace TCP/UDP endpoint that dials the upstream for
 // every accepted flow. Mesh packets never enter this stack.
 type Stack struct {
-	ep     *channel.Endpoint
-	stk    *stack.Stack
-	dialer Dialer
-	write  func([]byte)
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ep      *channel.Endpoint
+	stk     *stack.Stack
+	resolve Resolver
+	write   func([]byte)
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
 }
 
 func NewStack(mtu uint32, dialer Dialer, writeBack func([]byte)) (*Stack, error) {
+	return NewStackWithResolver(mtu, func(uint8, netip.AddrPort, netip.AddrPort) FlowDialer { return dialer }, writeBack)
+}
+
+// NewStackWithResolver is NewStack with a per-flow dialer choice
+// (per-app routing). A nil FlowDialer from resolve refuses the flow.
+func NewStackWithResolver(mtu uint32, resolve Resolver, writeBack func([]byte)) (*Stack, error) {
+	if resolve == nil {
+		return nil, fmt.Errorf("nil resolver")
+	}
 	if mtu == 0 {
 		mtu = 1280
 	}
@@ -60,7 +69,7 @@ func NewStack(mtu uint32, dialer Dialer, writeBack func([]byte)) (*Stack, error)
 		{Destination: header.IPv4EmptySubnet, NIC: nicID},
 		{Destination: header.IPv6EmptySubnet, NIC: nicID},
 	})
-	out := &Stack{ep: ep, stk: s, dialer: dialer, write: writeBack, cancel: cancel}
+	out := &Stack{ep: ep, stk: s, resolve: resolve, write: writeBack, cancel: cancel}
 
 	tcpFwd := tcp.NewForwarder(s, 0, 1024, out.handleTCP)
 	s.SetTransportProtocolHandler(tcp.ProtocolNumber, tcpFwd.HandlePacket)
@@ -115,8 +124,21 @@ func (s *Stack) pumpOutbound(ctx context.Context) {
 	}
 }
 
+func addrPortOf(a tcpip.Address, port uint16) netip.AddrPort {
+	ip, ok := netip.AddrFromSlice(a.AsSlice())
+	if !ok {
+		return netip.AddrPort{}
+	}
+	return netip.AddrPortFrom(ip.Unmap(), port)
+}
+
 func (s *Stack) handleTCP(r *tcp.ForwarderRequest) {
 	id := r.ID()
+	dialer := s.resolve(6, addrPortOf(id.RemoteAddress, id.RemotePort), addrPortOf(id.LocalAddress, id.LocalPort))
+	if dialer == nil {
+		r.Complete(true)
+		return
+	}
 	var wq waiter.Queue
 	ep, err := r.CreateEndpoint(&wq)
 	if err != nil {
@@ -131,7 +153,7 @@ func (s *Stack) handleTCP(r *tcp.ForwarderRequest) {
 		defer s.wg.Done()
 		defer local.Close()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		up, derr := s.dialer.DialTCP(ctx, dest)
+		up, derr := dialer.DialTCP(ctx, dest)
 		cancel()
 		if derr != nil {
 			log.Printf("forced upstream tcp %s: %v", dest, derr)
@@ -144,6 +166,10 @@ func (s *Stack) handleTCP(r *tcp.ForwarderRequest) {
 
 func (s *Stack) handleUDP(r *udp.ForwarderRequest) bool {
 	id := r.ID()
+	dialer := s.resolve(17, addrPortOf(id.RemoteAddress, id.RemotePort), addrPortOf(id.LocalAddress, id.LocalPort))
+	if dialer == nil {
+		return true // consumed and dropped: refused by policy
+	}
 	var wq waiter.Queue
 	ep, err := r.CreateEndpoint(&wq)
 	if err != nil {
@@ -161,11 +187,11 @@ func (s *Stack) handleUDP(r *udp.ForwarderRequest) bool {
 		defer s.wg.Done()
 		defer local.Close()
 		if dest.Port() == dnsPort {
-			s.proxyDNS(local, dest)
+			s.proxyDNS(dialer, local, dest)
 			return
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		up, derr := s.dialer.DialUDP(ctx, dest)
+		up, derr := dialer.DialUDP(ctx, dest)
 		cancel()
 		if derr != nil {
 			log.Printf("forced upstream udp %s: %v", dest, derr)
@@ -177,7 +203,7 @@ func (s *Stack) handleUDP(r *udp.ForwarderRequest) bool {
 	return true
 }
 
-func (s *Stack) proxyDNS(local net.PacketConn, dest netip.AddrPort) {
+func (s *Stack) proxyDNS(dialer FlowDialer, local net.PacketConn, dest netip.AddrPort) {
 	buf := make([]byte, 4096)
 	_ = local.SetDeadline(time.Now().Add(15 * time.Second))
 	n, addr, err := local.ReadFrom(buf)
@@ -185,7 +211,7 @@ func (s *Stack) proxyDNS(local net.PacketConn, dest netip.AddrPort) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	resp, err := s.dialer.ExchangeDNS(ctx, dest, buf[:n])
+	resp, err := dialer.ExchangeDNS(ctx, dest, buf[:n])
 	cancel()
 	if err != nil {
 		log.Printf("forced upstream dns %s: %v", dest, err)

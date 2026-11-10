@@ -30,6 +30,26 @@ type Dialer struct {
 	Cfg    Config
 	Dial   DialFunc // used to reach the proxy itself
 	Direct DialFunc // used only when FailClosed is false and the proxy is down
+	// Quiet keeps this dialer from reading or writing the forced-mode
+	// DNS/IPv6 status. Per-app proxies set it so one app's proxy cannot
+	// change the device-wide forced-proxy state.
+	Quiet bool
+}
+
+func (d Dialer) noteIPv6(state string) {
+	if !d.Quiet {
+		noteIPv6(state)
+	}
+}
+
+func (d Dialer) noteDNS(state string) {
+	if !d.Quiet {
+		noteDNS(state)
+	}
+}
+
+func (d Dialer) ipv6Blocked() bool {
+	return !d.Quiet && IPv6State() == IPv6Blocked
 }
 
 func (d Dialer) dialProxy(ctx context.Context) DialFunc {
@@ -39,7 +59,7 @@ func (d Dialer) dialProxy(ctx context.Context) DialFunc {
 	}
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		c, err := dial(ctx, network, address)
-		if err != nil {
+		if err != nil && !d.Quiet {
 			noteProxyDialFailed()
 		}
 		return c, err
@@ -56,7 +76,7 @@ func (d Dialer) DialTCP(ctx context.Context, dest string) (net.Conn, error) {
 	if !d.Cfg.Enabled() {
 		return nil, errors.New("forced upstream is off")
 	}
-	if destIsIPv6(dest) && IPv6State() == IPv6Blocked {
+	if destIsIPv6(dest) && d.ipv6Blocked() {
 		return nil, ErrIPv6Blocked
 	}
 	// Public DNS is always fail-closed: never the underlay, even if
@@ -79,19 +99,19 @@ func (d Dialer) DialTCP(ctx context.Context, dest string) (net.Conn, error) {
 	}
 	if err == nil {
 		if destIsIPv6(dest) {
-			noteIPv6(IPv6ViaProxy)
+			d.noteIPv6(IPv6ViaProxy)
 		}
 		if p, ok := destPort(dest); ok && p == dnsPort {
-			noteDNS("tcp")
+			d.noteDNS("tcp")
 		}
 		return c, nil
 	}
 	if p, ok := destPort(dest); ok && p == dnsPort {
-		noteDNS("blocked")
+		d.noteDNS("blocked")
 	}
 	if destIsIPv6(dest) {
 		if ipv6RejectedByProxy(err) {
-			noteIPv6(IPv6Blocked)
+			d.noteIPv6(IPv6Blocked)
 		}
 		return nil, err
 	}
@@ -174,7 +194,7 @@ func (d Dialer) DialUDP(ctx context.Context, dest netip.AddrPort) (net.PacketCon
 	if !d.Cfg.Enabled() {
 		return nil, errors.New("forced upstream is off")
 	}
-	if dest.Addr().Unmap().Is6() && IPv6State() == IPv6Blocked {
+	if dest.Addr().Unmap().Is6() && d.ipv6Blocked() {
 		return nil, ErrIPv6Blocked
 	}
 	if d.Cfg.Kind != KindSOCKS5 {

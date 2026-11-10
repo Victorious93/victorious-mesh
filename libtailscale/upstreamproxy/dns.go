@@ -32,20 +32,20 @@ func (d Dialer) ExchangeDNS(ctx context.Context, dest netip.AddrPort, query []by
 	if dd.Cfg.Kind == KindSOCKS5 {
 		resp, err := dd.exchangeDNSUDP(ctx, dest, query)
 		if err == nil {
-			noteDNS("udp")
+			dd.noteDNS("udp")
 			return resp, nil
 		}
 		if !errors.Is(err, ErrUDPNotSupported) && ctx.Err() != nil {
-			noteDNS("blocked")
+			dd.noteDNS("blocked")
 			return nil, err
 		}
 	}
 	resp, err := dd.exchangeDNSTCP(ctx, dest, query)
 	if err != nil {
-		noteDNS("blocked")
+		dd.noteDNS("blocked")
 		return nil, err
 	}
-	noteDNS("tcp")
+	dd.noteDNS("tcp")
 	return resp, nil
 }
 
