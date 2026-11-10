@@ -3,6 +3,8 @@
 
 package com.tailscale.ipn.ui.viewModel
 
+import com.tailscale.ipn.battery.BatterySaverMonitor
+import com.tailscale.ipn.battery.SaverReason
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -143,7 +145,8 @@ class TaildropViewModel(
     refreshJob = viewModelScope.launch {
       while (true) {
         loadTargets()
-        delay(refreshIntervalMs)
+        // Battery saver (off by default) slows this poll.
+        delay(if (BatterySaverMonitor.reason.value == SaverReason.OFF) refreshIntervalMs else BatterySaverMonitor.effects().taildropRefreshMs)
       }
     }
   }

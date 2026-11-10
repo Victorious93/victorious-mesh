@@ -162,6 +162,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun batterySaverIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Battery saver"))
+    assertTrue(text.contains("The kill switch, fail-closed, per-app blocking, and the tunnel itself are never touched"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

@@ -145,20 +145,39 @@ var loopWatchOnce sync.Once
 func startLoopWatch() {
 	loopWatchOnce.Do(func() {
 		go func() {
-			t := time.NewTicker(3 * time.Minute)
+			// Battery saver (off by default) stretches only the periodic
+			// check; a failed proxy dial still re-checks right away.
+			t := time.NewTimer(upstreamproxy.LoopWatchInterval())
 			defer t.Stop()
 			for {
 				select {
 				case <-t.C:
 				case <-upstreamproxy.ProxyDialFailures():
 					time.Sleep(2 * time.Second) // coalesce bursts
+				case <-upstreamproxy.PowerSaverChanged():
+					if upstreamproxy.PowerSaver() {
+						resetTimer(t, upstreamproxy.LoopWatchInterval())
+						continue
+					}
+					// Leaving saver: check now, then return to the normal pace.
 				}
 				cfg := upstreamproxy.Get()
 				if cfg.Enabled() && upstreamproxy.LoopPrefixesStale(cfg.Host) {
 					log.Printf("forced upstream: proxy address changed; reconfiguring")
 					reconfigureForcedVPN()
 				}
+				resetTimer(t, upstreamproxy.LoopWatchInterval())
 			}
 		}()
 	})
+}
+
+func resetTimer(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+	t.Reset(d)
 }

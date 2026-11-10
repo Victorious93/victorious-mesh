@@ -103,6 +103,7 @@ import com.tailscale.ipn.autoconnect.AutoConnectController
 import com.tailscale.ipn.autoconnect.AutoConnectEvent
 import com.tailscale.ipn.ui.view.AutoConnectView
 import com.tailscale.ipn.ui.view.ExtraTilesView
+import com.tailscale.ipn.ui.view.BatterySaverView
 import com.tailscale.ipn.ui.view.KillSwitchView
 import com.tailscale.ipn.ui.view.LeakCheckerView
 import com.tailscale.ipn.ui.view.ConnectionLogView
@@ -465,6 +466,7 @@ class MainActivity : ComponentActivity() {
               composable("connectionLog") { ConnectionLogView(backTo("settings")) }
               composable("victorGps") { VictorGpsView(backTo("settings")) }
               composable("tilesWidget") { ExtraTilesView(backTo("settings")) }
+              composable("batterySaver") { BatterySaverView(backTo("settings")) }
               composable("meshHealth") { MeshHealthView(backTo("settings")) }
               composable("remoteShell") { RemoteShellView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }

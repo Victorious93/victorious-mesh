@@ -367,6 +367,35 @@ The original **Victorious Mesh** Quick Settings tile still toggles the VPN. This
 
 After you turn this on, add the tiles from the Quick Settings editor and the widget from the home-screen widget picker. Turning the switch off hides those components again. The original connect tile is unchanged. There is **no fleet operation** for this.
 
+### Battery saver
+
+**Settings → Battery saver.** Off by default. **[not device-verified]**
+
+When **Use battery saver** is on, the app slows its own background checks while any of these is true:
+
+- the battery is at or below the level you pick (10, 15, 20, or 30%) and not charging;
+- the screen is off (switch **Also while the screen is off**);
+- Android's own Battery Saver is on (switch **Also while Android Battery Saver is on**).
+
+**What slows down while saving**
+
+| Check | Normal | Saving |
+|---|---|---|
+| Re-check the forced proxy's address | every 3 minutes | every 15 minutes |
+| Mesh Drop device list refresh | every 5 seconds | every 30 seconds |
+| Fleet theme connection retries | 30 s × attempt | 4 × longer |
+
+A failed proxy connection still re-checks the proxy address straight away, and leaving saver mode re-checks it at once.
+
+**What never changes.** The kill switch, fail-closed, per-app blocking, and the tunnel itself are never touched. The status card shows whether saving is active now and why.
+
+**Limits.**
+- Mesh keepalives are run by the mesh engine and are not changed here. The engine already stops them when the phone is idle. **[Likely]**
+- Keepalives you typed into a WireGuard profile are not changed, because stretching them can make the tunnel unreachable behind home routers. **[Certain]**
+- Actual battery savings have not been measured. **[Guessing]** They are probably small, because the biggest costs are the tunnel and your apps' own traffic.
+
+There is **no fleet operation** for this.
+
 ### Mesh speed / health
 
 ![Mesh speed / health](images/manual/mesh-health.png)

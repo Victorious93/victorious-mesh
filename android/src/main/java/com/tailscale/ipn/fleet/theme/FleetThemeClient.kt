@@ -3,6 +3,7 @@
 
 package com.tailscale.ipn.fleet.theme
 
+import com.tailscale.ipn.battery.BatterySaverMonitor
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
@@ -75,7 +76,8 @@ object FleetThemeClient {
 
   private fun scheduleRegisterRetry(app: Context) {
     if (!FleetThemePlanner.shouldRetryRegister(++registerAttempts, MAX_REGISTER_ATTEMPTS)) return
-    worker.postDelayed({ start(app) }, RETRY_MS * registerAttempts)
+    val slow = runCatching { BatterySaverMonitor.effects().themeRetryMultiplier }.getOrDefault(1)
+    worker.postDelayed({ start(app) }, RETRY_MS * registerAttempts * slow)
   }
 
   @Synchronized
