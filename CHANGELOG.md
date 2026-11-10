@@ -27,6 +27,11 @@
   local, size-capped (500 entries / 64 KB) list of connects, drops, exit
   node and forced-proxy changes, and kill switch events. No IP addresses;
   never part of a backup. **[not device-verified]**
+- Battery saver (**off by default**): Settings → Battery saver slows the
+  app's background checks (proxy address re-check 3 → 15 min, Mesh Drop
+  list 5 → 30 s, theme retries ×4) on low battery, screen off, or Android
+  Battery Saver. Never changes the kill switch, fail-closed, or per-app
+  blocking. **[not device-verified]**
 - Per-app exit node and proxy choice (**off by default**): in
   Settings → Per-app routing, each app can use the normal route, the
   phone's exit node, its own saved proxy, or Direct. The owning app of each

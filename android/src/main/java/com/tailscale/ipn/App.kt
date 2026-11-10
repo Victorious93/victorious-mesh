@@ -197,6 +197,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
     initViewModels()
     runCatching { ExtraTilesController.sync(this) }
     runCatching { FleetThemeClient.start(this) }
+    runCatching { com.tailscale.ipn.battery.BatterySaverMonitor.start(this) }
     applicationScope.launch {
       val restrictionsManager =
           getSystemService(Context.RESTRICTIONS_SERVICE) as RestrictionsManager

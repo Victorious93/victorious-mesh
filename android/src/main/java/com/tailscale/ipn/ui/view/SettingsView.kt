@@ -198,6 +198,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.battery_title,
+          subtitle = stringResource(R.string.battery_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("batterySaver") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.meshhealth_title,
           subtitle = stringResource(R.string.meshhealth_settings_subtitle),
           onClick = settingsNav.onNavigateToMeshHealth,
