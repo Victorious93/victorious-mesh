@@ -337,6 +337,22 @@ This page snapshots the mesh on this phone:
 
 **Limits.** WireGuard mode reports mesh **down** — this page is for the mesh, not a WireGuard profile. A mixed path (some direct, some relay) is still OK. All-relay, no online peers, or backend warnings are degraded. High disco-ping latency (250 ms or more) is a warning, not a down grade. There is **no fleet operation** for this.
 
+### Remote shell
+
+**Settings → Remote shell.** **[not device-verified]**
+
+Save a mesh device (for example your VictorSuite Kali or Termux node) with a user name and port, then tap **Open**:
+
+- **SSH app** opens an `ssh://user@host:port` link in an installed SSH app that handles such links (for example ConnectBot or JuiceSSH). If none is installed, the command is copied instead.
+- **Termux** copies the `ssh` command and opens Termux; paste it there. Termux's own SSH server usually listens on port **8022**.
+- **Copy command** only copies, for example `ssh -p 8022 u0_a123@100.64.0.6`.
+
+The device's current mesh address is looked up when you open it, so a picked device keeps working if its address changes. You can also type a mesh address or MagicDNS name.
+
+**No passwords are saved here.** Use SSH keys, or type the password in your SSH app. User names and addresses are checked, so nothing extra can be slipped into the command.
+
+**Limits.** Which SSH apps open `ssh://` links depends on the app. **[Likely]** Termux cannot be told to run the command by itself without an extra Termux permission and setting, so you paste it. **[Certain]** The session runs inside the SSH app over the mesh. The kill switch, forced proxy, and per-app choices for that app still apply. **[Likely]** There is **no fleet operation** for this.
+
 ### Fleet theme
 
 ![Fleet theme](images/manual/fleet-theme.png)

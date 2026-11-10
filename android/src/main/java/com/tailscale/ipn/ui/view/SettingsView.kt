@@ -184,6 +184,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.shell_title,
+          subtitle = stringResource(R.string.shell_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("remoteShell") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.split_tunneling,
           subtitle = stringResource(R.string.filter_apps_allowed_to_access_tailscale),
           onClick = settingsNav.onNavigateToSplitTunneling,

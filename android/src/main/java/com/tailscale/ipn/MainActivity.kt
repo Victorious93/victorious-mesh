@@ -108,6 +108,7 @@ import com.tailscale.ipn.ui.view.MeshHealthView
 import com.tailscale.ipn.ui.view.VictorGpsView
 import com.tailscale.ipn.ui.view.MeshShareView
 import com.tailscale.ipn.ui.view.PerAppRoutingView
+import com.tailscale.ipn.ui.view.RemoteShellView
 import com.tailscale.ipn.ui.view.ProxyView
 import com.tailscale.ipn.ui.view.WireGuardView
 import com.tailscale.ipn.ui.viewModel.AppViewModel
@@ -459,6 +460,7 @@ class MainActivity : ComponentActivity() {
               composable("victorGps") { VictorGpsView(backTo("settings")) }
               composable("tilesWidget") { ExtraTilesView(backTo("settings")) }
               composable("meshHealth") { MeshHealthView(backTo("settings")) }
+              composable("remoteShell") { RemoteShellView(backTo("settings")) }
               composable("help") { HelpView({ navController.popBackStack() }) }
               composable("controlServer") {
                 ControlServerView(

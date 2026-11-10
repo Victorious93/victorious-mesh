@@ -134,6 +134,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun remoteShellIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Remote shell"))
+    assertTrue(text.contains("**No passwords are saved here.**"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(
