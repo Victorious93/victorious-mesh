@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher controls for VictorLaunch and any launcher. Contract: ids
+     mesh_connect / mesh_disconnect, actions com.victorious.mesh.action.MESH_CONNECT /
+     MESH_DISCONNECT, target MeshControlActivity. Both ALWAYS show Mesh's own
+     confirm dialog; nothing toggles silently. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="mesh_connect"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_round"
+        android:shortcutShortLabel="@string/meshctl_shortcut_connect"
+        android:shortcutLongLabel="@string/meshctl_shortcut_connect_long">
+        <intent
+            android:action="com.victorious.mesh.action.MESH_CONNECT"
+            android:targetPackage="com.victorious.mesh"
+            android:targetClass="com.tailscale.ipn.launch.MeshControlActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="mesh_disconnect"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_round"
+        android:shortcutShortLabel="@string/meshctl_shortcut_disconnect"
+        android:shortcutLongLabel="@string/meshctl_shortcut_disconnect_long">
+        <intent
+            android:action="com.victorious.mesh.action.MESH_DISCONNECT"
+            android:targetPackage="com.victorious.mesh"
+            android:targetClass="com.tailscale.ipn.launch.MeshControlActivity" />
+    </shortcut>
+</shortcuts>

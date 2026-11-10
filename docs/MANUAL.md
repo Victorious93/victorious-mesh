@@ -516,6 +516,18 @@ Share files with your other mesh devices. Turn on **Share files on the mesh**, t
 - **Delete** opens a confirmation. That dialog currently sends you to a support web page rather than deleting the network itself.
 - The **⋮** menu: **Use an auth key**, or log in to an **alternate server** (a different control URL).
 
+### Launcher shortcuts (VictorLaunch)
+
+Long-press the Victorious Mesh icon (or use VictorLaunch) for **Connect mesh** and **Disconnect mesh**. **[not device-verified]**
+
+- Both **always** open Mesh's own dark confirm dialog first. Nothing connects or disconnects unless you tap **Connect** or **Disconnect** in that dialog; **Cancel**, Back, or tapping outside does nothing.
+- The confirm button only becomes tappable after a moment, and taps that pass through another app's overlay are ignored, so a launcher tap cannot land on it by accident.
+- If the VPN permission has not been granted yet, **Connect** shows Android's normal VPN permission dialog first. If you are not signed in, the app opens instead.
+- If the kill switch is armed, the disconnect dialog says so: confirming turns its protection off until you connect again, the same as the in-app switch. A disconnect you do not confirm never touches the kill switch.
+- If the mesh is already in the state you asked for, the dialog only says so.
+
+**For launcher developers.** Explicit intent to `com.victorious.mesh` / `com.tailscale.ipn.launch.MeshControlActivity` with action `com.victorious.mesh.action.MESH_CONNECT` or `com.victorious.mesh.action.MESH_DISCONNECT`. No permission is needed, extras are ignored, and the user always confirms. Static shortcut ids: `mesh_connect`, `mesh_disconnect`. The protected connect/disconnect broadcasts (`IPNReceiver`) are unchanged and still need the signature permission. There is no fleet operation for this.
+
 ### Quick Settings tile
 
 Add the **Victorious Mesh** tile in Android Quick Settings to toggle the VPN without opening the app. You still need VPN permission from the first run. Extra tiles and a home-screen widget stay off until you turn them on under **Settings → Tiles & widget**.
@@ -556,6 +568,7 @@ Victorious Mesh asks for the following. Android's VPN permission is separate fro
 | Foreground service | Keeps the VPN running while the app is in the background. |
 | Query all packages | Builds the list of installed apps for split tunneling. |
 | Location (asked only when needed) | Per-network DNS only: Android shows the Wi-Fi name to apps with location permission. Asked only when you add a named Wi-Fi rule; never used for anything else. |
+| Hide overlay windows | The launcher connect/disconnect confirm dialog hides other apps' overlays (Android 12+) so it cannot be tapped through. |
 
 The VPN service itself is not exported to other apps. The connect / disconnect / exit-node broadcast receiver (`com.tailscale.ipn.CONNECT_VPN`, `DISCONNECT_VPN`, `USE_EXIT_NODE`) is protected by the signature permission `com.victorious.mesh.permission.CONTROL_VPN`, so only apps signed with this app's own key can send them. Automation apps such as Tasker can no longer use these broadcasts. A disconnect broadcast is also **refused while the kill switch is on and armed**: another app can never turn the kill switch off. The fleet bridge service *is* exported, but every call is checked (see Fleet integration). Android backup is turned **off** for this app.
 
