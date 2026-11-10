@@ -105,6 +105,7 @@ import com.tailscale.ipn.ui.view.AutoConnectView
 import com.tailscale.ipn.ui.view.ExtraTilesView
 import com.tailscale.ipn.ui.view.KillSwitchView
 import com.tailscale.ipn.ui.view.LeakCheckerView
+import com.tailscale.ipn.ui.view.ConnectionLogView
 import com.tailscale.ipn.ui.view.MeshHealthView
 import com.tailscale.ipn.ui.view.VictorGpsView
 import com.tailscale.ipn.ui.view.MeshShareView
@@ -461,6 +462,7 @@ class MainActivity : ComponentActivity() {
               composable("killSwitch") { KillSwitchView(backTo("settings")) }
               composable("autoConnect") { AutoConnectView(backTo("settings")) }
               composable("leakChecker") { LeakCheckerView(backTo("settings")) }
+              composable("connectionLog") { ConnectionLogView(backTo("settings")) }
               composable("victorGps") { VictorGpsView(backTo("settings")) }
               composable("tilesWidget") { ExtraTilesView(backTo("settings")) }
               composable("meshHealth") { MeshHealthView(backTo("settings")) }

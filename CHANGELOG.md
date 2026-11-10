@@ -23,6 +23,10 @@
   mobile data. Pauses itself while the forced proxy is on; adds no route
   or bypass. Location permission is asked only for named Wi-Fi rules.
   **[not device-verified]**
+- Connection log (**off by default**): Settings → Connection log keeps a
+  local, size-capped (500 entries / 64 KB) list of connects, drops, exit
+  node and forced-proxy changes, and kill switch events. No IP addresses;
+  never part of a backup. **[not device-verified]**
 - Per-app exit node and proxy choice (**off by default**): in
   Settings → Per-app routing, each app can use the normal route, the
   phone's exit node, its own saved proxy, or Direct. The owning app of each
