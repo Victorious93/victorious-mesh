@@ -37,6 +37,8 @@ data class SettingsNav(
     val onNavigateToVictorGps: () -> Unit = {},
     val onNavigateToTilesWidget: () -> Unit = {},
     val onNavigateToMeshHealth: () -> Unit = {},
+    /** Batch 2 screens: navigate by route name. */
+    val onNavigateToRoute: (String) -> Unit = {},
 )
 
 class SettingsViewModel : IpnViewModel() {

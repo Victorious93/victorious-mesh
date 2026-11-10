@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Mesh file share (**off by default**): Settings → Mesh file share puts
+  files you add on a read-only, password-protected web page bound to this
+  phone's mesh IP only (never Wi-Fi/cellular). No uploads, no folders, no
+  hidden files, 2 GB cap; the password is generated and stored encrypted.
+  You can open a peer's share in the browser. **[not device-verified]**
 - Per-app exit node and proxy choice (**off by default**): in
   Settings → Per-app routing, each app can use the normal route, the
   phone's exit node, its own saved proxy, or Direct. The owning app of each

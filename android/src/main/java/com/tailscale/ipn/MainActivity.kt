@@ -106,6 +106,7 @@ import com.tailscale.ipn.ui.view.KillSwitchView
 import com.tailscale.ipn.ui.view.LeakCheckerView
 import com.tailscale.ipn.ui.view.MeshHealthView
 import com.tailscale.ipn.ui.view.VictorGpsView
+import com.tailscale.ipn.ui.view.MeshShareView
 import com.tailscale.ipn.ui.view.PerAppRoutingView
 import com.tailscale.ipn.ui.view.ProxyView
 import com.tailscale.ipn.ui.view.WireGuardView
@@ -362,6 +363,7 @@ class MainActivity : ComponentActivity() {
                       onNavigateToVictorGps = { navController.navigate("victorGps") },
                       onNavigateToTilesWidget = { navController.navigate("tilesWidget") },
                       onNavigateToMeshHealth = { navController.navigate("meshHealth") },
+                      onNavigateToRoute = { navController.navigate(it) },
                       onNavigateToBugReport = { navController.navigate("bugReport") },
                       onNavigateToAbout = { navController.navigate("about") },
                       onNavigateToDNSSettings = { navController.navigate("dnsSettings") },
@@ -449,6 +451,7 @@ class MainActivity : ComponentActivity() {
               composable("about") { AboutView(backTo("settings")) }
               composable("wireguard") { WireGuardView(backTo("settings")) }
               composable("proxy") { ProxyView(backTo("settings")) }
+              composable("meshShare") { MeshShareView(backTo("settings")) }
               composable("perAppRouting") { PerAppRoutingView(backTo("settings")) }
               composable("killSwitch") { KillSwitchView(backTo("settings")) }
               composable("autoConnect") { AutoConnectView(backTo("settings")) }

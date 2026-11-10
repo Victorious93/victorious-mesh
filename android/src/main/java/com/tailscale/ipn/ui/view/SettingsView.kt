@@ -126,6 +126,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.meshshare_title,
+          subtitle = stringResource(R.string.meshshare_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("meshShare") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.perapp_title,
           subtitle = stringResource(R.string.perapp_settings_subtitle),
           onClick = settingsNav.onNavigateToPerAppRouting,
