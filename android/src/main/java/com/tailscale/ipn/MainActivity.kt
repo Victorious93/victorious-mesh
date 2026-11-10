@@ -69,6 +69,7 @@ import com.tailscale.ipn.ui.util.universalFit
 import com.tailscale.ipn.ui.view.AboutView
 import com.tailscale.ipn.ui.view.BugReportView
 import com.tailscale.ipn.ui.view.DNSSettingsView
+import com.tailscale.ipn.ui.view.PerNetworkDnsView
 import com.tailscale.ipn.ui.view.ExitNodePicker
 import com.tailscale.ipn.ui.view.HealthView
 import com.tailscale.ipn.ui.view.HelpView
@@ -447,6 +448,7 @@ class MainActivity : ComponentActivity() {
               }
               composable("bugReport") { BugReportView(backTo("settings")) }
               composable("dnsSettings") { DNSSettingsView(backTo("settings")) }
+              composable("perNetworkDns") { PerNetworkDnsView(backTo("settings")) }
               composable("splitTunneling") { SplitTunnelAppPickerView(backTo("settings")) }
               composable("tailnetLock") { TailnetLockSetupView(backTo("settings")) }
               composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }

@@ -112,6 +112,28 @@ Use **Enable** / **Disable** on the main-screen exit node row to turn the chosen
 - See whether mesh DNS is on, plus resolvers, search domains, and split DNS routes (tap a value to copy it).
 - **Use Victorious Mesh DNS** turns mesh DNS on or off, unless a work policy hides the switch.
 
+### Per-network DNS
+
+**Settings → Per-network DNS.** Off by default. **[not device-verified]**
+
+Pick which DNS servers the mesh resolver asks, depending on the network the phone is on. With no matching rule, or with the switch off, the network's own DNS is used exactly as before.
+
+1. Turn on **Use per-network DNS**.
+2. Add a rule: **Named Wi-Fi** (type the Wi-Fi name), **Any other Wi-Fi**, or **Mobile data**, plus 1 to 4 DNS server IP addresses (for example `1.1.1.1, 9.9.9.9`, or a mesh Pi-hole's mesh IP).
+3. The screen shows the current network and which servers are in use.
+
+A named Wi-Fi rule wins over **Any other Wi-Fi**. Only IP addresses are accepted (no host names). `100.100.100.100`, loopback, and multicast are refused.
+
+**Safety.** This only swaps which upstream servers the mesh resolver forwards to. It adds no route and no bypass, so the kill switch, fail-closed, and per-app blocking work exactly as before. **It pauses itself while the forced proxy (Force all traffic) is on**, so forced-proxy DNS is left exactly as the Proxy settings make it.
+
+**Limits.**
+- It needs **Use Victorious Mesh DNS** turned on in DNS settings; otherwise it has no effect. **[Likely]**
+- If your Headscale server sets its own global DNS servers ("override local DNS"), those win. **[Certain]**
+- Android only gives apps the Wi-Fi name if location permission is granted (the app asks only when you add a named Wi-Fi rule) and location is turned on. Without it, named rules never match and **Any other Wi-Fi** is used. **[Certain]**
+- Which servers answer is up to the mesh resolver; lookups to these servers leave the phone the same way mesh DNS lookups always do. **[Likely]**
+
+There is **no fleet operation** for this.
+
 ### WireGuard
 
 ![WireGuard](images/manual/wireguard.png)
@@ -485,6 +507,7 @@ Victorious Mesh asks for the following. Android's VPN permission is separate fro
 | Boot completed | After you turn on Auto-connect, the app may try to start the last tunnel when the phone finishes booting. Android 12+ can still refuse that start. |
 | Foreground service | Keeps the VPN running while the app is in the background. |
 | Query all packages | Builds the list of installed apps for split tunneling. |
+| Location (asked only when needed) | Per-network DNS only: Android shows the Wi-Fi name to apps with location permission. Asked only when you add a named Wi-Fi rule; never used for anything else. |
 
 The VPN service itself is not exported to other apps. The connect / disconnect / exit-node broadcast receiver (`com.tailscale.ipn.CONNECT_VPN`, `DISCONNECT_VPN`, `USE_EXIT_NODE`) is protected by the signature permission `com.victorious.mesh.permission.CONTROL_VPN`, so only apps signed with this app's own key can send them. Automation apps such as Tasker can no longer use these broadcasts. A disconnect broadcast is also **refused while the kill switch is on and armed**: another app can never turn the kill switch off. The fleet bridge service *is* exported, but every call is checked (see Fleet integration). Android backup is turned **off** for this app.
 

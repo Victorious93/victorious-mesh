@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.tailscale.ipn.App
 import com.tailscale.ipn.MainActivity
+import com.tailscale.ipn.NetworkChangeCallback
 import com.tailscale.ipn.tiles.ExtraTilesController
 import com.tailscale.ipn.ui.notifier.Notifier
 import com.tailscale.ipn.util.TSLog
@@ -123,6 +124,8 @@ object MeshProxyController {
       TSLog.e(TAG, "forced upstream: ${e.message}")
       clearForced()
     }
+    // Per-network DNS pauses while the forced proxy is on; re-check it.
+    runCatching { NetworkChangeCallback.reapplyDns("forcedProxy") }
   }
 
   fun clearForced() {
@@ -130,6 +133,7 @@ object MeshProxyController {
       Libtailscale.clearForcedUpstream()
     } catch (_: Exception) {
     }
+    runCatching { NetworkChangeCallback.reapplyDns("forcedProxyOff") }
   }
 
   fun forcedDNSState(): ForcedDNSStatus =
