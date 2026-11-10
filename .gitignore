@@ -63,3 +63,7 @@ tailscale.version
 *.keystore
 !android/keystore/victorious-mesh-debug.jks
 local.properties
+
+# Kotlin compiler daemon session files
+*.salive
+android/.kotlin/
