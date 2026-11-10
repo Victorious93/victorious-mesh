@@ -107,6 +107,7 @@ import com.tailscale.ipn.ui.view.LeakCheckerView
 import com.tailscale.ipn.ui.view.MeshHealthView
 import com.tailscale.ipn.ui.view.VictorGpsView
 import com.tailscale.ipn.ui.view.MeshShareView
+import com.tailscale.ipn.ui.view.WakeOnLanView
 import com.tailscale.ipn.ui.view.PerAppRoutingView
 import com.tailscale.ipn.ui.view.RemoteShellView
 import com.tailscale.ipn.ui.view.ProxyView
@@ -454,6 +455,7 @@ class MainActivity : ComponentActivity() {
               composable("proxy") { ProxyView(backTo("settings")) }
               composable("meshShare") { MeshShareView(backTo("settings")) }
               composable("perAppRouting") { PerAppRoutingView(backTo("settings")) }
+              composable("wakeOnLan") { WakeOnLanView(backTo("settings")) }
               composable("killSwitch") { KillSwitchView(backTo("settings")) }
               composable("autoConnect") { AutoConnectView(backTo("settings")) }
               composable("leakChecker") { LeakCheckerView(backTo("settings")) }

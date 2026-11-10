@@ -141,6 +141,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun wakeOnLanIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Wake-on-LAN"))
+    assertTrue(text.contains("nothing is sent while the kill switch is holding traffic"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

@@ -140,6 +140,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.wol_title,
+          subtitle = stringResource(R.string.wol_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("wakeOnLan") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.killswitch_title,
           subtitle = stringResource(R.string.killswitch_settings_subtitle),
           onClick = settingsNav.onNavigateToKillSwitch,
