@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- Launcher controls for VictorLaunch: static shortcuts `mesh_connect` /
+  `mesh_disconnect` and an exported `MeshControlActivity` for the actions
+  `com.victorious.mesh.action.MESH_CONNECT` / `MESH_DISCONNECT` (no
+  permission needed). It always shows Mesh's own confirm dialog, never
+  toggles silently, uses the normal VPN permission flow, and does not
+  change the protected IPNReceiver. **[not device-verified]**
 - Mesh file share (**off by default**): Settings → Mesh file share puts
   files you add on a read-only, password-protected web page bound to this
   phone's mesh IP only (never Wi-Fi/cellular). No uploads, no folders, no

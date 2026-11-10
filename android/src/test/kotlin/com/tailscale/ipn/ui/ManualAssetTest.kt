@@ -169,6 +169,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun launcherShortcutsAreDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Launcher shortcuts (VictorLaunch)"))
+    assertTrue(text.contains("A disconnect you do not confirm never touches the kill switch."))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(
