@@ -148,6 +148,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun perNetworkDnsIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Per-network DNS"))
+    assertTrue(text.contains("pauses itself while the forced proxy"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

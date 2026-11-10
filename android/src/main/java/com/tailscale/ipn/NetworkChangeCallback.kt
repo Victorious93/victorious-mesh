@@ -8,6 +8,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
+import com.tailscale.ipn.dns.PerNetworkDns
 import com.tailscale.ipn.util.TSLog
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -70,7 +71,16 @@ object NetworkChangeCallback {
   // monitorDnsChanges sets up a network callback to monitor changes to the
   // system's network state and update the DNS configuration when interfaces
   // become available or properties of those interfaces change.
+  @Volatile private var monitoredDns: DnsConfig? = null
+
+  /** Re-run the DNS choice now (per-network DNS settings changed). */
+  fun reapplyDns(why: String) {
+    val dns = monitoredDns ?: return
+    lock.withLock { maybeUpdateDNSConfig(why, dns) }
+  }
+
   fun monitorDnsChanges(connectivityManager: ConnectivityManager, dns: DnsConfig) {
+    monitoredDns = dns
     val networkConnectivityRequest =
         NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -222,7 +232,20 @@ object NetworkChangeCallback {
       sb.append(searchDomains)
     }
 
-    if (dns.updateDNSFromNetwork(sb.toString())) {
+    // Per-network DNS (off by default) only swaps which upstream servers the
+    // mesh resolver forwards to. It never adds a route or a bypass, so the
+    // kill switch, forced-proxy DNS (fail-closed) and per-app rules apply as before.
+    val base =
+        runCatching {
+              PerNetworkDns.resolveBase(
+                  sb.toString(),
+                  wifi = info.caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI),
+                  cellular = info.caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR),
+              )
+            }
+            .getOrDefault(sb.toString())
+
+    if (dns.updateDNSFromNetwork(base)) {
       TSLog.d(TAG, "$why: updated DNS config for iface=${info.linkProps.interfaceName}")
 
       val gatewayIP =

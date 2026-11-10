@@ -112,6 +112,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.pndns_title,
+          subtitle = stringResource(R.string.pndns_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("perNetworkDns") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.wireguard_title,
           subtitle = stringResource(R.string.wireguard_settings_subtitle),
           onClick = settingsNav.onNavigateToWireGuard,
