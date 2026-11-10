@@ -13,6 +13,11 @@
   `ssh://` links, copies the command and opens Termux, or just copies it.
   No passwords are stored; user and host are validated against injection.
   **[not device-verified]**
+- Wake-on-LAN: Settings → Wake-on-LAN saves devices (MAC, address, port)
+  and sends magic packets on this Wi-Fi (LAN addresses only, refused
+  while the kill switch is holding traffic), over the mesh to a subnet-routed
+  LAN, or copies a `wakeonlan` command for a mesh device on that LAN.
+  **[not device-verified]**
 - Per-app exit node and proxy choice (**off by default**): in
   Settings → Per-app routing, each app can use the normal route, the
   phone's exit node, its own saved proxy, or Direct. The owning app of each

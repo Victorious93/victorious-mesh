@@ -223,6 +223,18 @@ When it is on:
 
 **Limits.** Per-app traffic totals are not tracked (that would need a usage-access permission this screen does not ask for). No GPS spoofing (VictorSpoof owns that). MDM split-tunnel lists still win over these choices. There is **no fleet operation** for this.
 
+### Wake-on-LAN
+
+**Settings → Wake-on-LAN.** **[not device-verified]**
+
+Save a computer's network card address (MAC, like `AA:BB:CC:DD:EE:FF`) and tap **Wake** to send a magic packet. The computer must have Wake-on-LAN turned on in its settings. Pick how the packet gets there:
+
+1. **This Wi-Fi** — sent on the network this phone is on, to `255.255.255.255` or the network's broadcast (for example `192.168.1.255`). This one leaves outside the VPN, so only home-network addresses are allowed, and nothing is sent while the kill switch is holding traffic.
+2. **Over the mesh** — sent through the VPN to a LAN reached by a Headscale subnet router. Type the computer's LAN IP or that LAN's broadcast.
+3. **Via a mesh device** — copies a `wakeonlan` command to run on a mesh device on that LAN (for example over **Remote shell**).
+
+**Limits.** **Over the mesh** works only if the subnet router still remembers the sleeping computer (unicast). Many routers drop broadcasts from outside the LAN. **[Likely]** `255.255.255.255` cannot cross the mesh. **[Certain]** **Via a mesh device** needs the `wakeonlan` tool on that device; Victorious Mesh cannot make another phone send the packet by itself. **[Certain]** SecureOn passwords are not supported. There is **no fleet operation** for this (a `wol.send` op through a relay node could be proposed to the Fleet Orchestrator).
+
 ### Kill switch
 
 ![Kill switch](images/manual/kill-switch.png)
