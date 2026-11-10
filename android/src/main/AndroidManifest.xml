@@ -26,6 +26,12 @@
     <queries>
         <package android:name="com.victorious.launch" />
         <provider android:authorities="com.victorious.launch.theme" />
+        <!-- Remote shell: find Termux and apps that open ssh:// links. -->
+        <package android:name="com.termux" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="ssh" />
+        </intent>
     </queries>
 
     <!-- Disable input emulation on ChromeOS -->
