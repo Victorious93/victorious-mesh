@@ -393,6 +393,20 @@ On Android 12 and older, the app may also ask for storage access so Mesh Drop ca
 
 **Send:** From another app, use Android **Share** and pick Victorious Mesh. Choose a device (recent or all). Sharing needs the mesh to be connected; otherwise you are asked to connect first.
 
+### Mesh file share
+
+**Settings → Mesh file share** (off by default). **[not device-verified]**
+
+Share files with your other mesh devices. Turn on **Share files on the mesh**, then **Add files**. The files are copied into this app (the originals are not touched) and listed on a small, read-only web page at this phone's mesh address, for example `http://100.64.0.9:8090/`.
+
+- Only devices on your mesh can reach it. It listens on the mesh address only, never on Wi‑Fi or cellular.
+- Every visit needs the **share password** (the browser asks; any user name works). The password is made for you, kept encrypted on the phone, and can be replaced with **Make a new password**. From a computer: `curl -u mesh:PASSWORD -O http://100.64.0.9:8090/f/notes.txt`.
+- Nobody can upload, delete, or see folders or hidden files. Downloads always save as files.
+- **Open another device's share** opens a peer's share page in your browser (same port as yours).
+- The shared folder is capped at 2 GB. **Stop sharing** removes a file from the share.
+
+**Limits.** Plain `http` inside the mesh: the mesh tunnel itself is encrypted, but the page is not HTTPS. **[Certain]** Another device's share only opens if it runs Victorious Mesh file share on the same port. **[Certain]** Sharing stops while the mesh is down or in WireGuard mode. The kill switch, forced proxy, and per-app blocking are unchanged; the share answers only mesh traffic. **[Likely]** There is **no fleet operation** for this (a read-only `share.status` op could be proposed to the Fleet Orchestrator).
+
 ### Accounts
 
 **Settings →** tap your user row (after VPN permission has been granted)

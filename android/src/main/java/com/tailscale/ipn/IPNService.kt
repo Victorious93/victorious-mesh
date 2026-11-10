@@ -19,6 +19,7 @@ import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.proxy.MeshProxyController
 import com.tailscale.ipn.proxy.ProxyPlanner
 import com.tailscale.ipn.routing.PerAppController
+import com.tailscale.ipn.share.MeshShareController
 import com.tailscale.ipn.routing.PerAppPlanner
 import com.tailscale.ipn.routing.PerAppStore
 import com.tailscale.ipn.wireguard.EncryptedPrefsSecretStore
@@ -54,6 +55,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       refreshMeshProxy()
     } else {
       MeshProxyController.stop(this)
+      MeshShareController.stop()
       if (!closed) {
         holdAndRestartIfArmed()
       }
@@ -468,7 +470,9 @@ open class IPNService : VpnService(), libtailscale.IPNService {
       MeshProxyController.stop(this)
       MeshProxyController.clearForced()
       PerAppController.clear()
+      MeshShareController.stop()
     } else {
+      MeshShareController.sync(this)
       MeshProxyController.sync(this)
       MeshProxyController.syncForced(this)
       PerAppController.sync(this)

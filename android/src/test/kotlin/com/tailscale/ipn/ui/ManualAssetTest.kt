@@ -127,6 +127,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun meshFileShareIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("### Mesh file share"))
+    assertTrue(text.contains("It listens on the mesh address only"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(
