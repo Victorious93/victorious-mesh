@@ -176,6 +176,13 @@ class ManualAssetTest {
   }
 
   @Test
+  fun engineDnsThroughProxyIsDocumented() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    assertTrue(text.contains("**Mesh resolver lookups.**"))
+    assertTrue(text.contains("are **blocked if the proxy is down**, even if **Fail closed** is off"))
+  }
+
+  @Test
   fun parserHandlesCommonManualMarkup() {
     val blocks =
         ManualMarkdown.parse(

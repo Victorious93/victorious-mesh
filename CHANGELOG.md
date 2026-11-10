@@ -63,6 +63,11 @@
   **[not device-verified]**
 
 ### Fixed
+- Forced proxy: the mesh resolver's own outside DNS lookups (DNS over TCP,
+  DNS over TLS, and DNS over HTTPS to well-known public resolvers) went
+  directly on Wi-Fi/cellular even with Force all traffic on. They now go
+  through the proxy and are blocked if it is down. Nothing changes with
+  the forced proxy off. **[not device-verified]**
 - Fleet theme: provider queries run on a background thread and are debounced; observer registration failures fall back to the built-in theme and retry (capped).
 - Leak checker: the HTTP connection is always closed, the "checking" state is always cleared, and only https sighting URLs are used.
 - Backup import: forbidden mesh-IP keys are checked on parsed JSON keys (catches escaped/nested keys; no false positives on values).
