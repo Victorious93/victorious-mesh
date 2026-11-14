@@ -4,6 +4,7 @@
 package libtailscale
 
 import (
+	"github.com/tailscale/tailscale-android/libtailscale/netx"
 	"github.com/tailscale/tailscale-android/libtailscale/upstreamproxy"
 	"tailscale.com/net/netmon"
 	"tailscale.com/net/netns"
@@ -30,6 +31,7 @@ func installEngineDNSGuard(d *tsdial.Dialer, logf logger.Logf, netMon *netmon.Mo
 		Cfg:       upstreamproxy.Get,
 		ProxyDial: protectedDial,
 		Direct:    direct.DialContext,
+		NewDialer: func(cfg upstreamproxy.Config) upstreamproxy.Dialer { return netx.Shared.DialerFor(cfg, false) },
 	}
 	d.SetSystemDialerForTest(g.Dial)
 }

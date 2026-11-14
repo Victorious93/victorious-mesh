@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"sync/atomic"
 
+	"github.com/tailscale/tailscale-android/libtailscale/netx"
 	"github.com/tailscale/tailscale-android/libtailscale/perapp"
 	"github.com/tailscale/tailscale-android/libtailscale/upstreamproxy"
 )
@@ -81,9 +82,9 @@ func dialerForRoute(r perapp.Route) upstreamproxy.FlowDialer {
 	case perapp.RouteDirect:
 		return upstreamproxy.DirectDialer{Dial: protectedDial}
 	case perapp.RouteProxy:
-		d := upstreamproxy.Dialer{Cfg: r.Proxy, Dial: protectedDial, Quiet: true}
+		d := netx.Shared.DialerFor(r.Proxy, true)
 		if !r.Proxy.FailClosed {
-			d.Direct = protectedDial
+			d.Direct = protectedDial // never used for Tor/I2P backends or reserved names
 		}
 		return d
 	}
@@ -95,11 +96,36 @@ func forcedDialer() upstreamproxy.FlowDialer {
 	if !cfg.Enabled() {
 		return nil
 	}
-	return upstreamproxy.Dialer{Cfg: cfg, Dial: protectedDial, Direct: protectedDial}
+	d := netx.Shared.DialerFor(cfg, false)
+	d.Direct = protectedDial
+	return d
 }
 
-// resolveFlow is the userspace stack's per-flow dialer choice.
+// resolveFlow is the userspace stack's per-flow dialer choice. It wraps
+// resolveFlowRoute with the reserved-name rules: a synthetic virtual
+// address only ever goes to a Tor/I2P backend dialer (never direct, never
+// a plain proxy), and encrypted DNS (DoT, port 853) is refused while an
+// overlay backend is required, because its query names cannot be inspected.
 func resolveFlow(proto uint8, src, dst netip.AddrPort) upstreamproxy.FlowDialer {
+	d := resolveFlowRoute(proto, src, dst)
+	if d == nil {
+		return nil
+	}
+	if upstreamproxy.IsVirtualAddr(dst.Addr()) {
+		pd, ok := d.(upstreamproxy.Dialer)
+		if !ok || pd.Cfg.Backend == upstreamproxy.BackendNone {
+			return nil
+		}
+	}
+	if dst.Port() == 853 {
+		if pd, ok := d.(upstreamproxy.Dialer); ok && pd.Cfg.Backend != upstreamproxy.BackendNone {
+			return nil
+		}
+	}
+	return d
+}
+
+func resolveFlowRoute(proto uint8, src, dst netip.AddrPort) upstreamproxy.FlowDialer {
 	p := perapp.Get()
 	forced := upstreamproxy.Get().Enabled()
 	if !p.Active() {
