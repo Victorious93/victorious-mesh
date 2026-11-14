@@ -7,7 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tailscale.ipn.NetworkChangeCallback
 import com.tailscale.ipn.dns.CurrentNetwork
+import com.tailscale.ipn.dns.DnsEffect
 import com.tailscale.ipn.dns.DnsRule
+import com.tailscale.ipn.dns.EffectiveDns
 import com.tailscale.ipn.dns.PerNetworkDns
 import com.tailscale.ipn.dns.PerNetworkDnsConfig
 import com.tailscale.ipn.dns.PerNetworkDnsPlanner
@@ -41,9 +43,11 @@ class PerNetworkDnsViewModel : ViewModel() {
   }
 
   val paused: StateFlow<Boolean> = MutableStateFlow(PerNetworkDns.pausedForForcedProxy)
+  val effective: StateFlow<EffectiveDns> = MutableStateFlow(PerNetworkDns.effective)
 
   fun refresh() {
     paused.set(PerNetworkDns.pausedForForcedProxy)
+    effective.set(PerNetworkDns.effective)
     active.set(PerNetworkDns.lastApplied)
     network.set(PerNetworkDns.lastNetwork)
   }

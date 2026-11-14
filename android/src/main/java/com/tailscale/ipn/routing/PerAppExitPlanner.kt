@@ -5,6 +5,7 @@ package com.tailscale.ipn.routing
 
 import com.tailscale.ipn.proxy.SavedProxy
 import com.tailscale.ipn.proxy.SavedProxyPlanner
+import com.tailscale.ipn.proxy.OverlayBackend
 import com.tailscale.ipn.proxy.UpstreamKind
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -159,12 +160,16 @@ object PerAppExitPlanner {
                       val p = rule.route.proxy
                       if (rule.route.action == PerAppAction.PROXY && p != null) {
                         putJsonObject("proxy") {
-                          put("kind", if (p.kind == UpstreamKind.HTTP) "http" else "socks5")
+                          // Never map an unknown kind to SOCKS5: an https proxy must stay https.
+                          put("kind", p.kind.wire)
                           put("host", p.host.trim())
                           put("port", p.port)
                           if (p.username.isNotEmpty()) put("username", p.username)
                           if (p.password.isNotEmpty()) put("password", p.password)
                           put("failClosed", failClosed)
+                          if (p.serverName.isNotBlank()) put("serverName", p.serverName.trim())
+                          if (p.backend != OverlayBackend.NONE) put("backend", p.backend.wire)
+                          if (p.outproxy.isNotBlank()) put("outproxy", p.outproxy.trim())
                         }
                       }
                     }

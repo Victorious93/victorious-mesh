@@ -76,6 +76,10 @@ type EngineDNSGuard struct {
 	ProxyDial DialFunc
 	// Direct is the engine's normal system dial (protected socket).
 	Direct DialFunc
+	// NewDialer, if set, builds the proxy dialer for cfg (so Tor / I2P
+	// profiles get their name map and SAM session). It must leave
+	// Direct nil.
+	NewDialer func(Config) Dialer
 }
 
 // Dial is a drop-in system dialer. Everything that is not engine DNS, and
@@ -95,6 +99,10 @@ func (g EngineDNSGuard) Dial(ctx context.Context, network, address string) (net.
 	}
 	cfg.FailClosed = true
 	d := Dialer{Cfg: cfg, Dial: g.ProxyDial} // Direct nil: never the underlay
+	if g.NewDialer != nil {
+		d = g.NewDialer(cfg)
+		d.Direct = nil
+	}
 	c, err := d.DialTCP(ctx, address)
 	if err != nil {
 		noteDNS("blocked")

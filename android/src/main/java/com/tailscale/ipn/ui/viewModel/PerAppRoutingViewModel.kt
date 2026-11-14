@@ -11,6 +11,7 @@ import com.tailscale.ipn.routing.AppRoute
 import com.tailscale.ipn.routing.AppRouteKind
 import com.tailscale.ipn.routing.IpSightingParser
 import com.tailscale.ipn.proxy.SavedProxy
+import com.tailscale.ipn.proxy.UpstreamKind
 import com.tailscale.ipn.proxy.SavedProxyPlanner
 import com.tailscale.ipn.routing.PerAppController
 import com.tailscale.ipn.routing.PerAppExitPlanner
@@ -100,6 +101,38 @@ class PerAppRoutingViewModel(app: Application) : AndroidViewModel(app) {
   }
 
   fun deleteProxy(id: String) = change { PerAppController.savedProxies().delete(id) }
+
+  fun duplicateProxy(id: String) {
+    change { PerAppController.savedProxies().duplicate(id) }
+    proxyMessage.set("Duplicated")
+  }
+
+  /** Parses a proxy URI with the core's strict parser (port 1–65535, IPv6 in brackets). */
+  fun parseProxyUri(raw: String): SavedProxy? {
+    val o = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(libtailscale.Libtailscale.parseProxyURI(raw)) as kotlinx.serialization.json.JsonObject }.getOrNull()
+    if (o == null) {
+      proxyMessage.set("Could not read that URI")
+      return null
+    }
+    o["error"]?.let {
+      proxyMessage.set("Not a usable proxy URI: ${(it as kotlinx.serialization.json.JsonPrimitive).content}")
+      return null
+    }
+    fun s(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+    val kind =
+        when (s("kind")) {
+          "http" -> UpstreamKind.HTTP
+          "https" -> UpstreamKind.HTTPS
+          "socks5" -> UpstreamKind.SOCKS5
+          "sam" -> UpstreamKind.SAM
+          else -> UpstreamKind.NONE
+        }
+    return SavedProxy(
+        id = "", name = "", kind = kind, host = s("host"), port = s("port").toIntOrNull() ?: 0,
+        username = s("username"), password = s("password"),
+        backend = com.tailscale.ipn.proxy.OverlayBackend.entries.firstOrNull { it.wire == s("backend") } ?: com.tailscale.ipn.proxy.OverlayBackend.NONE,
+    )
+  }
 
   fun exitChoices(): List<ExitChoice> {
     val peers = Notifier.netmap.value?.Peers.orEmpty().filter { it.isExitNode }

@@ -16,7 +16,10 @@ import (
 )
 
 const (
-	MinPort = 1024
+	// MinPort is the lowest REMOTE proxy port. Remote endpoints may use
+	// any TCP port; only locally bound listeners (meshproxy) keep the
+	// unprivileged 1024 floor.
+	MinPort = 1
 	MaxPort = 65535
 )
 
@@ -24,9 +27,35 @@ type Kind string
 
 const (
 	KindNone   Kind = ""
-	KindHTTP   Kind = "http"
-	KindSOCKS5 Kind = "socks5"
+	KindHTTP   Kind = "http"   // HTTP CONNECT over plaintext TCP to the proxy
+	KindHTTPS  Kind = "https"  // HTTP CONNECT inside a verified TLS session to the proxy
+	KindSOCKS5 Kind = "socks5" // SOCKS5 (CONNECT, UDP ASSOCIATE)
+	KindSAM    Kind = "sam"    // I2P SAM v3 streaming bridge (TCP only)
 )
+
+// Backend names a naming-aware service behind the proxy endpoint. It
+// changes how reserved names (.onion, .i2p) are treated; "" is an
+// ordinary proxy that never sees reserved names.
+type Backend string
+
+const (
+	BackendNone Backend = ""
+	// BackendTor: a Tor SOCKS5 endpoint. Hostnames are passed to Tor
+	// unresolved; .onion names are only ever sent to this backend.
+	BackendTor Backend = "tor"
+	// BackendI2PSAM: an I2P router's SAM v3 bridge (Host:Port is SAM).
+	BackendI2PSAM Backend = "i2p-sam"
+	// BackendI2PHTTP: an I2P router's HTTP proxy (usually 127.0.0.1:4444).
+	BackendI2PHTTP Backend = "i2p-http"
+)
+
+func (b Backend) valid() bool {
+	switch b {
+	case BackendNone, BackendTor, BackendI2PSAM, BackendI2PHTTP:
+		return true
+	}
+	return false
+}
 
 // Config is the user-chosen upstream. Zero value is off.
 type Config struct {
@@ -36,14 +65,39 @@ type Config struct {
 	Username   string
 	Password   string
 	FailClosed bool
+	// ServerName is the TLS name checked against the proxy certificate
+	// (KindHTTPS only). Empty means Host. It is never used to skip
+	// verification: there is no "insecure" option.
+	ServerName string
+	// Backend marks a Tor/I2P gateway. See [Backend].
+	Backend Backend
+	// Outproxy is the explicit, optional clearnet exit for I2P
+	// backends. For i2p-sam it is the I2P name of an outproxy that
+	// speaks HTTP CONNECT; for i2p-http any non-empty value asserts
+	// that the router itself has an outproxy configured. Empty means
+	// clearnet destinations are refused (no direct fallback).
+	Outproxy string
 }
 
 func (c Config) Enabled() bool {
-	return (c.Kind == KindHTTP || c.Kind == KindSOCKS5) && c.Host != "" && ValidPort(c.Port)
+	switch c.Kind {
+	case KindHTTP, KindHTTPS, KindSOCKS5, KindSAM:
+	default:
+		return false
+	}
+	return strings.TrimSpace(c.Host) != "" && ValidPort(c.Port)
+}
+
+// TLSName is the name the proxy certificate must match.
+func (c Config) TLSName() string {
+	if n := strings.TrimSpace(c.ServerName); n != "" {
+		return n
+	}
+	return strings.Trim(strings.TrimSpace(c.Host), "[]")
 }
 
 func (c Config) ProxyAddr() string {
-	return net.JoinHostPort(strings.TrimSpace(c.Host), fmt.Sprintf("%d", c.Port))
+	return net.JoinHostPort(strings.Trim(strings.TrimSpace(c.Host), "[]"), fmt.Sprintf("%d", c.Port))
 }
 
 func ValidPort(port int32) bool { return port >= MinPort && port <= MaxPort }
@@ -59,8 +113,13 @@ func ParseKind(s string) (Kind, error) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "", "none", "off":
 		return KindNone, nil
-	case "http", "https", "http-connect", "connect":
+	case "http", "http-connect", "connect":
 		return KindHTTP, nil
+	case "sam", "i2p-sam":
+		return KindSAM, nil
+	case "https", "https-connect":
+		// TLS to the proxy itself. Never aliased to plaintext HTTP.
+		return KindHTTPS, nil
 	case "socks5", "socks":
 		return KindSOCKS5, nil
 	default:
@@ -83,6 +142,30 @@ func Validate(c Config) error {
 	}
 	if _, err := ParseKind(string(c.Kind)); err != nil {
 		return err
+	}
+	if !c.Backend.valid() {
+		return fmt.Errorf("unknown backend %q", c.Backend)
+	}
+	if c.Backend == BackendTor && c.Kind != KindSOCKS5 {
+		return fmt.Errorf("the Tor backend needs a SOCKS5 endpoint")
+	}
+	if c.Backend == BackendI2PHTTP && c.Kind != KindHTTP {
+		return fmt.Errorf("the I2P HTTP backend needs an HTTP proxy endpoint")
+	}
+	if (c.Backend == BackendI2PSAM) != (c.Kind == KindSAM) {
+		return fmt.Errorf("the SAM endpoint kind and the i2p-sam backend go together")
+	}
+	if c.Outproxy != "" && c.Backend != BackendI2PSAM && c.Backend != BackendI2PHTTP {
+		return fmt.Errorf("an outproxy only applies to I2P backends")
+	}
+	if c.Backend == BackendI2PSAM && c.Outproxy != "" && ClassifyName(c.Outproxy) != NameI2P {
+		return fmt.Errorf("an I2P outproxy must be an .i2p name")
+	}
+	if c.ServerName != "" && c.Kind != KindHTTPS {
+		return fmt.Errorf("a TLS server name only applies to https proxies")
+	}
+	if len(c.Username) > 255 || len(c.Password) > 255 {
+		return fmt.Errorf("username and password must be at most 255 bytes")
 	}
 	return nil
 }

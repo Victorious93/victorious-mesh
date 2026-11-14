@@ -151,7 +151,8 @@ class ManualAssetTest {
   fun perNetworkDnsIsDocumented() {
     val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
     assertTrue(text.contains("### Per-network DNS"))
-    assertTrue(text.contains("pauses itself while the forced proxy"))
+    assertTrue(text.contains("deliberately NOT applied while the forced proxy"))
+    assertTrue(text.contains("never looks like it is active") || text.contains("A rule never looks active while it is being ignored"))
   }
 
   @Test
@@ -204,5 +205,19 @@ class ManualAssetTest {
     assertTrue(blocks.any { it is MdBlock.OrderedList })
     assertTrue(blocks.any { it is MdBlock.Image && it.path.contains("main.png") })
     assertTrue(blocks.any { it is MdBlock.Table && it.headers == listOf("A", "B") })
+  }
+
+  @Test
+  fun torI2pAndDnsToolsAreDocumentedWithTheirLimits() {
+    val text = javaClass.classLoader!!.getResourceAsStream(ManualAsset.PATH)!!.bufferedReader().use { it.readText() }
+    for (h in listOf("#### Tor", "#### I2P", "### DNS tools", "#### Proxy kinds, ports and what is enforced")) {
+      assertTrue("manual is missing $h", text.contains(h))
+    }
+    // The limits must be written down, not just the features.
+    assertTrue(text.contains("never retried without TLS"))
+    assertTrue(text.contains("This app does not validate DNSSEC itself") || text.contains("does not validate DNSSEC itself"))
+    assertTrue(text.contains("inconclusive"))
+    assertTrue(text.contains("one VPN at a time"))
+    assertTrue(text.contains("not an ordinary") || text.contains("is **not** a general VPN"))
   }
 }

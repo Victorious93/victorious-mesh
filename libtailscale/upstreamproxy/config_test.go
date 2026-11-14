@@ -14,8 +14,16 @@ func TestValidateAndDefaults(t *testing.T) {
 	if (Config{}).Enabled() {
 		t.Fatal("zero config must be off")
 	}
-	if err := Validate(Config{Kind: KindHTTP, Host: "1.2.3.4", Port: 80}); err == nil {
-		t.Fatal("privileged port")
+	// Remote proxies may listen on any TCP port 1-65535.
+	for _, p := range []int32{1, 80, 443, 65535} {
+		if err := Validate(Config{Kind: KindHTTP, Host: "1.2.3.4", Port: p}); err != nil {
+			t.Fatalf("port %d: %v", p, err)
+		}
+	}
+	for _, p := range []int32{0, -1, 65536} {
+		if err := Validate(Config{Kind: KindHTTP, Host: "1.2.3.4", Port: p}); err == nil {
+			t.Fatalf("port %d accepted", p)
+		}
 	}
 	if err := Validate(Config{Kind: KindHTTP, Host: "1.2.3.4", Port: 8080, Username: "u"}); err == nil {
 		t.Fatal("one-sided auth")
@@ -39,6 +47,13 @@ func TestParseKind(t *testing.T) {
 	}
 	if _, err := ParseKind("ftp"); err == nil {
 		t.Fatal("expected error")
+	}
+	// "https" must be its own kind: it used to alias plaintext HTTP.
+	if k, err := ParseKind("https"); err != nil || k != KindHTTPS {
+		t.Fatalf("https parsed as %q (%v)", k, err)
+	}
+	if k, _ := ParseKind("http"); k != KindHTTP {
+		t.Fatalf("http parsed as %q", k)
 	}
 }
 

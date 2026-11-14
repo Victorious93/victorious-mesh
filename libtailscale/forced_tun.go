@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/tailscale/tailscale-android/libtailscale/netx"
 	"github.com/tailscale/tailscale-android/libtailscale/perapp"
 	"github.com/tailscale/tailscale-android/libtailscale/upstreamproxy"
 	"github.com/tailscale/wireguard-go/tun"
@@ -15,15 +16,19 @@ import (
 type forcedTUN struct {
 	inner tun.Device
 	stack *upstreamproxy.Stack
+	// guard: answer DNS queries for reserved overlay names (.onion,
+	// .i2p) locally instead of letting them reach any resolver.
+	guard bool
 }
 
 func wrapForcedTUN(dev tun.Device) tun.Device {
 	cfg := upstreamproxy.Get()
 	perApp := perapp.Get().Active()
-	if !cfg.Enabled() && !perApp {
+	guard := netx.Shared.GuardEnabled()
+	if !cfg.Enabled() && !perApp && !guard {
 		return dev
 	}
-	w := &forcedTUN{inner: dev}
+	w := &forcedTUN{inner: dev, guard: guard || cfg.Enabled() || perApp}
 	if !cfg.Enabled() && !perAppNeedsStack() {
 		// Per-app rules only pick the exit node: no stack needed,
 		// but Read still classifies each flow.
@@ -83,7 +88,7 @@ func (t *forcedTUN) Read(slab []byte, packets []tun.ReadPacket) (int, error) {
 			return n, err
 		}
 		pol := perapp.Get()
-		if !pol.Active() && t.stack == nil {
+		if !pol.Active() && t.stack == nil && !t.guard {
 			return n, err
 		}
 		gen := perAppGen.Load()
@@ -91,8 +96,17 @@ func (t *forcedTUN) Read(slab []byte, packets []tun.ReadPacket) (int, error) {
 		kept := 0
 		for i := 0; i < n; i++ {
 			raw := readPacketBytes(slab, packets[i])
+			if t.guard {
+				if reply, ok := netx.Shared.Gate().HandlePacket(raw); ok {
+					t.writeBack(reply) // answered locally; the query goes nowhere
+					continue
+				}
+			}
 			var toEngine, toStack bool
-			if pol.Active() {
+			if !pol.Active() && t.stack == nil {
+				// Guard-only mode: everything else is untouched.
+				toEngine = true
+			} else if pol.Active() {
 				r := perAppClassifier.Classify(raw, pol, gen, forced)
 				toEngine = r.Kind == perapp.RouteEngine
 				toStack = r.UsesStack()

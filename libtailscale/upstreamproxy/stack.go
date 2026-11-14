@@ -38,6 +38,7 @@ type Stack struct {
 	write   func([]byte)
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
+	closed  sync.Once
 }
 
 func NewStack(mtu uint32, dialer Dialer, writeBack func([]byte)) (*Stack, error) {
@@ -101,10 +102,15 @@ func (s *Stack) HandleInbound(pkt []byte) {
 	s.ep.InjectInbound(proto, pb)
 }
 
+// Close tears the stack down. Every in-flight flow's outside leg is
+// closed before it returns (the VPN is rebuilt this way when the policy
+// changes), and it is safe to call more than once.
 func (s *Stack) Close() {
-	s.cancel()
-	s.stk.Close()
-	s.ep.Close()
+	s.closed.Do(func() {
+		s.cancel()
+		s.stk.Close()
+		s.ep.Close()
+	})
 	s.wg.Wait()
 }
 

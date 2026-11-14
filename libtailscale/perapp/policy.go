@@ -77,7 +77,7 @@ func (p Policy) Strict() bool {
 		return false
 	}
 	for _, r := range p.Rules {
-		if r.Action == ActionBlock || (r.Action == ActionProxy && r.Proxy.FailClosed) {
+		if r.Action == ActionBlock || (r.Action == ActionProxy && (r.Proxy.FailClosed || r.Proxy.Backend != upstreamproxy.BackendNone)) {
 			return true
 		}
 	}
@@ -91,6 +91,9 @@ type wireProxy struct {
 	Username   string `json:"username,omitempty"`
 	Password   string `json:"password,omitempty"`
 	FailClosed *bool  `json:"failClosed,omitempty"`
+	ServerName string `json:"serverName,omitempty"`
+	Backend    string `json:"backend,omitempty"`
+	Outproxy   string `json:"outproxy,omitempty"`
 }
 
 type wireRule struct {
@@ -154,6 +157,9 @@ func parseRule(wr wireRule) Rule {
 			Username:   wr.Proxy.Username,
 			Password:   wr.Proxy.Password,
 			FailClosed: wr.Proxy.FailClosed == nil || *wr.Proxy.FailClosed,
+			ServerName: wr.Proxy.ServerName,
+			Backend:    upstreamproxy.Backend(wr.Proxy.Backend),
+			Outproxy:   wr.Proxy.Outproxy,
 		}
 		if !cfg.Enabled() || upstreamproxy.Validate(cfg) != nil {
 			return Rule{Action: ActionBlock}

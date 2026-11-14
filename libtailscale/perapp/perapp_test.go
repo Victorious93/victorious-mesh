@@ -5,6 +5,7 @@ package perapp
 
 import (
 	"encoding/binary"
+	"github.com/tailscale/tailscale-android/libtailscale/upstreamproxy"
 	"net/netip"
 	"testing"
 	"time"
@@ -65,6 +66,32 @@ func TestParsePolicy(t *testing.T) {
 	}
 }
 
+// Remote proxy ports are 1-65535: port 80 or 443 is a valid proxy.
+func TestParseLowRemotePortsAreValid(t *testing.T) {
+	p := mustPolicy(t, `{"enabled":true,"rules":[
+	 {"uid":1,"action":"proxy","proxy":{"kind":"http","host":"x","port":80}},
+	 {"uid":2,"action":"proxy","proxy":{"kind":"https","host":"x","port":443,"serverName":"x.example"}},
+	 {"uid":3,"action":"proxy","proxy":{"kind":"socks5","host":"127.0.0.1","port":9050,"backend":"tor"}},
+	 {"uid":4,"action":"proxy","proxy":{"kind":"https","host":"x","port":443,"serverName":""}},
+	 {"uid":5,"action":"proxy","proxy":{"kind":"socks5","host":"x","port":1080,"backend":"i2p-sam"}}
+	]}`)
+	for _, uid := range []int32{1, 2, 3, 4} {
+		if p.Rules[uid].Action != ActionProxy {
+			t.Errorf("uid %d: got %v", uid, p.Rules[uid].Action)
+		}
+	}
+	if p.Rules[2].Proxy.Kind != upstreamproxy.KindHTTPS || p.Rules[2].Proxy.ServerName != "x.example" {
+		t.Fatalf("https lost its TLS identity: %+v", p.Rules[2].Proxy)
+	}
+	if p.Rules[3].Proxy.Backend != upstreamproxy.BackendTor {
+		t.Fatalf("%+v", p.Rules[3].Proxy)
+	}
+	// Mismatched backend/kind combination fails closed.
+	if p.Rules[5].Action != ActionBlock {
+		t.Fatalf("invalid backend combination must block, got %v", p.Rules[5].Action)
+	}
+}
+
 func TestParseEmptyIsOff(t *testing.T) {
 	p := mustPolicy(t, "")
 	if p.Active() || p.NeedsCapture() || p.Strict() {
@@ -81,7 +108,7 @@ func TestParseBadRulesFailClosed(t *testing.T) {
 	 {"uid":1,"action":"proxy"},
 	 {"uid":2,"action":"proxy","proxy":{"kind":"socks5","host":"","port":1080}},
 	 {"uid":3,"action":"proxy","proxy":{"kind":"gopher","host":"x","port":1080}},
-	 {"uid":4,"action":"proxy","proxy":{"kind":"http","host":"x","port":80}},
+	 {"uid":4,"action":"proxy","proxy":{"kind":"http","host":"x","port":0}},
 	 {"uid":5,"action":"teleport"},
 	 {"uid":6,"action":"proxy","proxy":{"kind":"http","host":"x","port":8080,"username":"u"}}
 	]}`)

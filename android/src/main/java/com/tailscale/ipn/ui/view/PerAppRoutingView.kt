@@ -113,6 +113,8 @@ fun PerAppRoutingView(onBack: BackNavigation, model: PerAppRoutingViewModel = vi
           message = proxyMessage,
           onSave = { model.saveProxy(it) == null },
           onDelete = { model.deleteProxy(it) },
+          onDuplicate = { model.duplicateProxy(it) },
+          onParseUri = { model.parseProxyUri(it) },
       )
 
       NeonCard {
@@ -224,7 +226,14 @@ private fun SavedProxiesCard(
     message: String?,
     onSave: (SavedProxy) -> Boolean,
     onDelete: (String) -> Unit,
+    onDuplicate: (String) -> Unit,
+    onParseUri: (String) -> SavedProxy?,
 ) {
+  val ctx = androidx.compose.ui.platform.LocalContext.current
+  var tlsName by remember { mutableStateOf("") }
+  var backend by remember { mutableStateOf(com.tailscale.ipn.proxy.OverlayBackend.NONE) }
+  var outproxy by remember { mutableStateOf("") }
+  var uri by remember { mutableStateOf("") }
   var editingId by remember { mutableStateOf("") }
   var name by remember { mutableStateOf("") }
   var kind by remember { mutableStateOf(UpstreamKind.SOCKS5) }
@@ -240,6 +249,10 @@ private fun SavedProxiesCard(
     portText = DEFAULT_SAVED_PROXY_PORT.toString()
     user = ""
     pass = ""
+    tlsName = ""
+    backend = com.tailscale.ipn.proxy.OverlayBackend.NONE
+    outproxy = ""
+    uri = ""
   }
 
   NeonCard {
@@ -266,8 +279,20 @@ private fun SavedProxiesCard(
               portText = p.port.toString()
               user = p.username
               pass = p.password
+              tlsName = p.serverName
+              backend = p.backend
+              outproxy = p.outproxy
             }) {
               Text(stringResource(R.string.perapp_proxy_edit))
+            }
+        TextButton(onClick = { onDuplicate(p.id) }) { Text(stringResource(R.string.perapp_proxy_duplicate)) }
+        TextButton(
+            onClick = {
+              // Never includes the password or the user name.
+              (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                  .setPrimaryClip(android.content.ClipData.newPlainText("proxy", p.redactedExport()))
+            }) {
+              Text(stringResource(R.string.perapp_proxy_copy_redacted))
             }
         TextButton(
             onClick = {
@@ -292,14 +317,64 @@ private fun SavedProxiesCard(
         modifier = Modifier.fillMaxWidth(),
     )
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      listOf(UpstreamKind.SOCKS5, UpstreamKind.HTTP).forEach { k ->
+      listOf(UpstreamKind.SOCKS5, UpstreamKind.HTTP, UpstreamKind.HTTPS, UpstreamKind.SAM).forEach { k ->
         FilterChip(
             selected = kind == k,
-            onClick = { kind = k },
-            label = { Text(if (k == UpstreamKind.HTTP) "HTTP CONNECT" else "SOCKS5") },
+            onClick = {
+              kind = k
+              // A backend that cannot go with the new kind is cleared, never kept silently.
+              backend =
+                  when {
+                    k == UpstreamKind.SAM -> com.tailscale.ipn.proxy.OverlayBackend.I2P_SAM
+                    k == UpstreamKind.SOCKS5 && backend == com.tailscale.ipn.proxy.OverlayBackend.TOR -> backend
+                    k == UpstreamKind.HTTP && backend == com.tailscale.ipn.proxy.OverlayBackend.I2P_HTTP -> backend
+                    else -> com.tailscale.ipn.proxy.OverlayBackend.NONE
+                  }
+              if (k != UpstreamKind.HTTPS) tlsName = ""
+            },
+            label = {
+              Text(
+                  when (k) {
+                    UpstreamKind.HTTP -> "HTTP CONNECT"
+                    UpstreamKind.HTTPS -> "HTTPS CONNECT (TLS)"
+                    UpstreamKind.SAM -> "I2P SAM"
+                    else -> "SOCKS5"
+                  })
+            },
         )
       }
     }
+    if (kind == UpstreamKind.SOCKS5 || kind == UpstreamKind.HTTP) {
+      val special = if (kind == UpstreamKind.SOCKS5) com.tailscale.ipn.proxy.OverlayBackend.TOR else com.tailscale.ipn.proxy.OverlayBackend.I2P_HTTP
+      FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = backend == com.tailscale.ipn.proxy.OverlayBackend.NONE, onClick = { backend = com.tailscale.ipn.proxy.OverlayBackend.NONE }, label = { Text(stringResource(R.string.proxy_backend_plain)) })
+        FilterChip(selected = backend == special, onClick = { backend = special }, label = { Text(if (special == com.tailscale.ipn.proxy.OverlayBackend.TOR) stringResource(R.string.proxy_backend_tor) else stringResource(R.string.proxy_backend_i2p_http)) })
+      }
+    }
+    if (kind == UpstreamKind.HTTPS) {
+      OutlinedTextField(tlsName, { tlsName = it }, label = { Text(stringResource(R.string.proxy_tls_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    }
+    if (backend == com.tailscale.ipn.proxy.OverlayBackend.I2P_SAM || backend == com.tailscale.ipn.proxy.OverlayBackend.I2P_HTTP) {
+      OutlinedTextField(outproxy, { outproxy = it }, label = { Text(stringResource(R.string.proxy_outproxy)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    }
+    // Import from a URI such as socks5://user:pass@[2001:db8::1]:1080 or https://proxy.example:443
+    OutlinedTextField(uri, { uri = it }, label = { Text(stringResource(R.string.perapp_proxy_uri)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    TextButton(
+        enabled = uri.isNotBlank(),
+        onClick = {
+          onParseUri(uri.trim())?.let {
+            kind = it.kind
+            host = it.host
+            portText = it.port.toString()
+            user = it.username
+            pass = it.password
+            backend = it.backend
+            if (name.isBlank()) name = it.host
+            uri = "" // do not leave the pasted credentials sitting in the field
+          }
+        }) {
+          Text(stringResource(R.string.perapp_proxy_uri_import))
+        }
     OutlinedTextField(
         host,
         { host = it },
@@ -342,6 +417,9 @@ private fun SavedProxiesCard(
                         port = portText.toIntOrNull() ?: 0,
                         username = user,
                         password = pass,
+                        serverName = tlsName,
+                        backend = backend,
+                        outproxy = outproxy,
                     ))
             if (ok) reset()
           }) {

@@ -94,7 +94,7 @@ class PerAppExitPlannerTest {
     assertEquals(PerAppAction.BLOCK, resolve(AppRoute("a", AppRouteKind.UPSTREAM_PROXY, proxyId = "gone")).action)
     // Empty proxyId means Settings → Proxy, which is not in this list.
     assertEquals(PerAppAction.BLOCK, resolve(AppRoute("a", AppRouteKind.UPSTREAM_PROXY)).action)
-    val bad = SavedProxy("p3", "Bad", UpstreamKind.SOCKS5, "198.51.100.9", 80)
+    val bad = SavedProxy("p3", "Bad", UpstreamKind.SOCKS5, "198.51.100.9", 0)
     val r =
         PerAppExitPlanner.resolve(
             AppRoute("a", AppRouteKind.UPSTREAM_PROXY, proxyId = "p3"), true, true, null, listOf(bad), 34)
@@ -221,7 +221,10 @@ class PerAppExitPlannerTest {
   fun savedProxyValidation() {
     assertNull(SavedProxyPlanner.problem(socks))
     assertNotNull(SavedProxyPlanner.problem(socks.copy(host = "")))
-    assertNotNull(SavedProxyPlanner.problem(socks.copy(port = 80)))
+    // Remote proxies may use any port 1-65535 (80 and 443 are common for CONNECT proxies).
+    assertNull(SavedProxyPlanner.problem(socks.copy(port = 80)))
+    assertNotNull(SavedProxyPlanner.problem(socks.copy(port = 0)))
+    assertNotNull(SavedProxyPlanner.problem(socks.copy(port = 65536)))
     assertNotNull(SavedProxyPlanner.problem(socks.copy(username = "u")))
     assertNotNull(SavedProxyPlanner.problem(socks.copy(kind = UpstreamKind.NONE)))
     assertNull(SavedProxyPlanner.fromMainUpstream(UpstreamProxyConfig()))

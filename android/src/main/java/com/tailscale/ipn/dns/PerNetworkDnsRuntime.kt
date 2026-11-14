@@ -23,6 +23,11 @@ object PerNetworkDns {
   var lastNetwork: CurrentNetwork? = null
     private set
 
+  /** What the rules are doing right now (applied, paused, no match…). */
+  @Volatile
+  var effective: EffectiveDns = EffectiveDns(DnsEffect.DISABLED, null)
+    private set
+
   /** True when the last check skipped the rules because the forced proxy is on. */
   @Volatile
   var pausedForForcedProxy: Boolean = false
@@ -58,6 +63,7 @@ object PerNetworkDns {
     if (!c.enabled) {
       lastApplied = null
       pausedForForcedProxy = false
+      effective = EffectiveDns(DnsEffect.DISABLED, null)
       lastNetwork = CurrentNetwork(wifi, cellular, null)
       return base
     }
@@ -66,7 +72,8 @@ object PerNetworkDns {
     val ssid = if (wifi) runCatching { currentSsid(App.get()) }.getOrNull() else null
     val net = CurrentNetwork(wifi, cellular, ssid)
     val rule = PerNetworkDnsPlanner.pick(c, net, forcedProxy = forced)
-    pausedForForcedProxy = forced
+    effective = PerNetworkDnsPlanner.effective(c, net, forced)
+    pausedForForcedProxy = effective.effect == DnsEffect.PAUSED_FORCED_PROXY
     lastNetwork = net
     lastApplied = rule
     return PerNetworkDnsPlanner.applyToBase(base, rule)

@@ -13,6 +13,7 @@ import (
 
 	"net/netip"
 
+	"github.com/tailscale/tailscale-android/libtailscale/netx"
 	"github.com/tailscale/tailscale-android/libtailscale/perapp"
 	"github.com/tailscale/tailscale-android/libtailscale/upstreamproxy"
 	"tailscale.com/wgengine/router"
@@ -42,10 +43,21 @@ func SetForcedUpstream(kind, host string, port int32, username, password string,
 	return nil
 }
 
+// SetForcedUpstreamJSON is SetForcedUpstream with the full profile:
+// kind http | https | socks5 | sam, TLS server name, Tor / I2P backend
+// and outproxy. See netx.ProxyJSON. Any change drops stale virtual
+// addresses, I2P sessions and DNS caches.
+func SetForcedUpstreamJSON(profileJSON string) error {
+	if err := netx.Shared.SetForced(profileJSON); err != nil {
+		return err
+	}
+	startLoopWatch()
+	return nil
+}
+
 // ClearForcedUpstream turns the forced path off.
 func ClearForcedUpstream() {
-	upstreamproxy.Clear()
-	reconfigureForcedVPN()
+	netx.Shared.ClearForced() // also reconfigures the VPN
 }
 
 // ForcedUpstreamEnabled reports whether the Go path is armed.
