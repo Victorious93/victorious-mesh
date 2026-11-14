@@ -336,3 +336,21 @@ func hostPort(t testing.TB, addr string) (string, int32) {
 func contextWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), d)
 }
+
+// readLine2 reads a line from c without buffering past it (tests that
+// already consumed a banner through another reader).
+func readLine2(t testing.TB, c net.Conn) string {
+	t.Helper()
+	_ = c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	var sb strings.Builder
+	b := make([]byte, 1)
+	for {
+		if _, err := c.Read(b); err != nil {
+			t.Fatalf("read: %v (got %q)", err, sb.String())
+		}
+		if b[0] == '\n' {
+			return sb.String()
+		}
+		sb.WriteByte(b[0])
+	}
+}

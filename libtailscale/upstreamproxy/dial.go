@@ -412,7 +412,9 @@ func (d Dialer) DialUDP(ctx context.Context, dest netip.AddrPort) (net.PacketCon
 	if dest.Addr().Unmap().Is6() && d.ipv6Blocked() {
 		return nil, ErrIPv6Blocked
 	}
-	if d.Cfg.Kind != KindSOCKS5 {
+	if d.Cfg.Kind != KindSOCKS5 || d.Cfg.Backend != BackendNone {
+		// HTTP CONNECT, SAM streams and Tor cannot carry arbitrary UDP
+		// (Tor does not implement UDP ASSOCIATE). Blocked, never direct.
 		return nil, ErrUDPNotSupported
 	}
 	return d.dialSOCKS5UDP(ctx, dest)
