@@ -68,6 +68,12 @@ func OverlayBackend() string { return netx.Shared.BackendArmed() }
 // OverlayMappingCount is the number of live name↔virtual-address entries.
 func OverlayMappingCount() int { return netx.Shared.MappingCount() }
 
+// ParseProxyURI parses http / https / socks5 / socks5h / sam URIs into JSON.
+func ParseProxyURI(raw string) string { return netx.Shared.ParseURI(raw) }
+
+// RedactProxyURI shows a profile as a URI with user name and password hidden.
+func RedactProxyURI(proxyJSON string) string { return netx.Shared.RedactURI(proxyJSON) }
+
 func ProxyTest(proxyJSON, targetJSON string) string {
 	return netx.Shared.ProxyTest(proxyJSON, targetJSON)
 }

@@ -303,3 +303,21 @@ func TestLeakCheckJSONIsInconclusiveWithoutObserver(t *testing.T) {
 
 var _ = bufio.NewReader
 var _ = netip.Addr{}
+
+func TestParseAndRedactURI(t *testing.T) {
+	c := New()
+	out := c.ParseURI("https://u:p%40ss@[2001:db8::1]:443")
+	var m map[string]any
+	if err := json.Unmarshal([]byte(out), &m); err != nil || m["kind"] != "https" || m["host"] != "2001:db8::1" || m["password"] != "p@ss" || m["port"].(float64) != 443 {
+		t.Fatalf("%s", out)
+	}
+	for _, bad := range []string{"https://host", "ftp://h:1", "socks5://h:0", "http://h:70000"} {
+		if !strings.Contains(c.ParseURI(bad), "error") {
+			t.Errorf("%s accepted", bad)
+		}
+	}
+	red := c.RedactURI(`{"kind":"socks5","host":"h.example","port":1080,"username":"alice","password":"hunter2"}`)
+	if strings.Contains(red, "hunter2") || strings.Contains(red, "alice") || !strings.Contains(red, "h.example:1080") {
+		t.Fatalf("%q", red)
+	}
+}

@@ -152,6 +152,42 @@ SOCKS5 UDP ASSOCIATE or is blocked; fail-closed blocks flows if the
 proxy drops. Literal non-mesh proxy IPs are excluded from the VPN to
 avoid a loop. Status is shown on the Proxy screen. **[not device-verified]**
 
+**Proxy kinds.** HTTP CONNECT, **HTTPS CONNECT** (verified TLS to the
+proxy: wrong-name, unknown-CA and expired certificates fail and are never
+retried in plaintext; verification cannot be disabled), SOCKS5 (host names
+passed to the proxy) and **I2P SAM**. Remote proxy ports are 1–65535 (only
+the port you *share* keeps 1024+). Saved proxies can be duplicated, edited,
+imported from a URI (`socks5://user:pass@[2001:db8::1]:1080`) and copied
+without secrets. A **Test connection** button reports reachability / TLS /
+authentication / negotiation / forwarding separately. HTTP is advisory on
+Android 10+; HTTPS, SOCKS5 and SAM are enforced only with **Force all
+traffic**. **[not device-verified]**
+
+**Tor** (external service — Orbot in SOCKS-only mode, or `tor` on a mesh
+node; not embedded) and **I2P** (your router's SAM bridge): selected TCP is
+forwarded by name, `.onion` (v3, checksum-verified) and `.i2p` DNS queries
+are answered on the phone with virtual addresses and **never reach any DNS
+server**, Tor/I2P never fall back to a direct connection, UDP is blocked,
+and an unavailable backend means blocked, not leaked. Clearnet through I2P
+needs an explicit outproxy. No bootstrap/circuit telemetry is shown (it
+would need Tor's ControlPort, which is not wired up). See the manual.
+**[not device-verified; no live Tor/I2P network was used]**
+
+**DNS tools** (Settings → DNS tools): A/AAAA/CNAME/MX/NS/TXT/SOA/PTR/SRV/CAA
+and reverse lookups over UDP, TCP, **DoT** and **DoH** (certificates always
+verified, no plaintext fallback, hostname resolvers need bootstrap IPs and
+are never resolved with other DNS), explicit routes (direct / mesh / proxy /
+Tor that never silently reroute), TTL-aware positive and negative cache,
+resolver comparison and latency, honest DNSSEC reporting (resolver claim
+vs. no local validation), local host mappings and allow/block rules, bounded
+opt-in history, copy/export. Private, `.local`, `.onion` and `.i2p` names
+never reach public resolvers. Mesh DNS config (Headscale routes, private
+zones, search domains) is not modified by the tools. **[not device-verified]**
+
+**Per-network DNS under the forced proxy** is deliberately *not applied*
+(applying it would let DNS bypass the proxy); the screen now says so
+instead of looking active.
+
 **Fleet bridge:** no new operations. The Orchestrator must ratify any later
 remote control.
 
@@ -197,10 +233,16 @@ more reliable. No start before first unlock. No new fleet operations.
 **Settings → Leak checker.** Off by default (on-demand only).
 **[not device-verified]**
 
-Reports this app's VPN, kill switch, Direct-app count, mesh DNS, and a
-public IP from the Per-app routing endpoint. Cannot prove other apps
-are leak-free. WebRTC/STUN and pre-VPN sockets are out of scope. No
-new fleet operations.
+Every line is tagged **settings**, **observed** or **verified**.
+Configuration (VPN, kill switch, proxy fail-open, ignored per-network DNS,
+Tor/I2P down, Direct apps) can never be "verified". A public IP is observed
+for this app only and says nothing about DNS. DNS is only **verified** by
+the observation test (a unique name under a zone you control, plus an
+https results endpoint that says which resolvers asked); with no service,
+or if the service never saw the query, the result is **inconclusive**, never
+passed, and the headline says it is not a clean bill of health. Other apps'
+own encrypted DNS, WebRTC/STUN and pre-VPN sockets are out of scope. No
+fleet operations.
 
 ## VictorGPS stub
 

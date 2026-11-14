@@ -56,7 +56,7 @@ class ProxyPlannerTest {
     val blank = ProxyPlanner.planOutbound(UpstreamKind.HTTP, "", 8080, 33)
     assertFalse(blank.applyHttpProxy)
 
-    val badPort = ProxyPlanner.planOutbound(UpstreamKind.HTTP, "1.2.3.4", 80, 33)
+    val badPort = ProxyPlanner.planOutbound(UpstreamKind.HTTP, "1.2.3.4", 0, 33)
     assertFalse(badPort.applyHttpProxy)
   }
 

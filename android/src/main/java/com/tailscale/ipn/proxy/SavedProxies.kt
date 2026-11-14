@@ -22,9 +22,32 @@ data class SavedProxy(
     val port: Int = DEFAULT_SAVED_PROXY_PORT,
     val username: String = "",
     val password: String = "",
+    // Added after the first release; absent in older stored lists, which
+    // therefore load unchanged with these defaults.
+    val serverName: String = "",
+    val backend: OverlayBackend = OverlayBackend.NONE,
+    val outproxy: String = "",
 ) {
   override fun toString(): String =
-      "SavedProxy(id=$id, name=$name, kind=$kind, host=$host, port=$port, username=${username.isNotEmpty()}, password=***)"
+      "SavedProxy(id=$id, name=$name, kind=$kind, host=$host, port=$port, username=${username.isNotEmpty()}, password=***, backend=$backend)"
+
+  /**
+   * A shareable description with every secret removed: no password and
+   * no username (only whether credentials exist). Safe for logs, screenshots
+   * and exports. Never include [password].
+   */
+  fun redactedExport(): String = buildString {
+    append("name=").append(name).append('\n')
+    append("kind=").append(kind.wire).append('\n')
+    append("endpoint=").append(endpointLabel()).append('\n')
+    if (serverName.isNotBlank()) append("tlsName=").append(serverName).append('\n')
+    if (backend != OverlayBackend.NONE) append("backend=").append(backend.wire).append('\n')
+    if (outproxy.isNotBlank()) append("outproxy=").append(outproxy).append('\n')
+    append("credentials=").append(if (username.isNotEmpty()) "set (not exported)" else "none").append('\n')
+  }
+
+  fun endpointLabel(): String =
+      if (host.contains(':') && !host.startsWith("[")) "[$host]:$port" else "$host:$port"
 }
 
 const val DEFAULT_SAVED_PROXY_PORT = 1080
@@ -56,6 +79,12 @@ class SavedProxyStore(private val store: SecretStore) {
     write(list().filterNot { it.id == id })
   }
 
+  /** A copy under a new id with " (copy)" appended; credentials are kept. */
+  fun duplicate(id: String): SavedProxy? {
+    val src = get(id) ?: return null
+    return save(src.copy(id = "", name = "${src.name} (copy)"))
+  }
+
   private fun write(list: List<SavedProxy>) {
     store.put(KEY, json.encodeToString(ListSerializer(SavedProxy.serializer()), list))
   }
@@ -69,11 +98,16 @@ object SavedProxyPlanner {
   /** Null when usable; otherwise a short plain-language reason. */
   fun problem(p: SavedProxy): String? =
       when {
-        p.kind == UpstreamKind.NONE -> "pick HTTP or SOCKS5"
+        p.kind == UpstreamKind.NONE -> "pick HTTP, HTTPS, SOCKS5 or SAM"
         p.host.isBlank() -> "host is empty"
         p.host.trim().contains(' ') -> "host has a space"
-        !ProxyPlanner.validPort(p.port) -> "port must be $MIN_PROXY_PORT–$MAX_PROXY_PORT"
+        !ProxyPlanner.validRemotePort(p.port) -> "port must be $MIN_REMOTE_PROXY_PORT–$MAX_PROXY_PORT"
         !ProxyPlanner.authComplete(p.username, p.password) -> "set both username and password, or neither"
+        p.serverName.isNotBlank() && p.kind != UpstreamKind.HTTPS -> "a TLS name only applies to HTTPS proxies"
+        p.backend == OverlayBackend.TOR && p.kind != UpstreamKind.SOCKS5 -> "Tor needs a SOCKS5 endpoint"
+        p.backend == OverlayBackend.I2P_HTTP && p.kind != UpstreamKind.HTTP -> "the I2P HTTP proxy needs the HTTP kind"
+        (p.backend == OverlayBackend.I2P_SAM) != (p.kind == UpstreamKind.SAM) -> "SAM and the I2P SAM backend go together"
+        p.outproxy.isNotBlank() && p.backend != OverlayBackend.I2P_SAM && p.backend != OverlayBackend.I2P_HTTP -> "an outproxy only applies to I2P"
         else -> null
       }
 
@@ -88,6 +122,9 @@ object SavedProxyPlanner {
         port = cfg.port,
         username = cfg.username,
         password = cfg.password,
+        serverName = cfg.serverName,
+        backend = cfg.backend,
+        outproxy = cfg.outproxy,
     )
   }
 }

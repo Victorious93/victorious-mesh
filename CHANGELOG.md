@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Proxy, Tor, I2P and DNS (Victorious)
+
+- **Fix:** the Go core accepted the scheme `https` but treated it as plaintext HTTP, and the CONNECT dialer never started TLS (no shipped screen offered `https`, so this was reachable only through the core's own parser). `https` is now its own kind with certificate-verified TLS before any CONNECT or credential is sent; certificate failures stop the connection and are never retried in plaintext; there is no insecure option.
+- **Hardened:** the per-app policy JSON mapped every non-HTTP proxy kind to SOCKS5; kinds are now passed through exactly so a new kind can never be silently reinterpreted.
+- **Fix:** remote proxy ports accept 1–65535 (the 1024 floor remains only for locally bound listeners).
+- Staged connection test (reachability, TLS, authentication, negotiation, forwarding); SOCKS5 and CONNECT errors carry their stage.
+- Tor backend (external SOCKS service), I2P backend (SAM v3 streams, bounded long-lived session, optional explicit outproxy), v3 `.onion` validation, bounded virtual-address mapping for transparent flows, always-on `.onion`/`.i2p` DNS guard, UDP blocked and no direct fallback under Tor/I2P.
+- DNS tools: ten record types, reverse lookups, UDP/TCP/DoT/DoH with verified TLS and strict bootstrap, explicit routes, TTL-aware positive/negative cache, compare, latency, DNSSEC claim reporting, local rules, opt-in bounded history.
+- Per-network DNS now states plainly when it is paused by the forced proxy.
+- Leak checker separates settings, observed and verified evidence; missing measurement is inconclusive, never passed.
+- Deterministic policy precedence (`libtailscale/netpolicy`).
+- No new fleet operations; fleet authentication, scopes and confirmations are unchanged.
+- No new third-party dependencies (Go standard library `crypto/sha3`; `golang.org/x/net/dns/dnsmessage` was already in `x/net`).
+
 ### Added
 - Launcher controls for VictorLaunch: static shortcuts `mesh_connect` /
   `mesh_disconnect` and an exported `MeshControlActivity` for the actions

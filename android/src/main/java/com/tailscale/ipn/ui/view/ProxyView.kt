@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tailscale.ipn.proxy.ForcedDNSStatus
 import com.tailscale.ipn.proxy.ForcedIPv6Status
+import com.tailscale.ipn.proxy.OverlayBackend
 import com.tailscale.ipn.proxy.UpstreamKind
 import com.tailscale.ipn.ui.viewModel.ProxyViewModel
 import com.victorious.mesh.R
@@ -54,6 +56,11 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
   var upPort by remember(upstream.port) { mutableStateOf(upstream.port.toString()) }
   var upUser by remember(upstream.username) { mutableStateOf(upstream.username) }
   var upPass by remember { mutableStateOf(upstream.password) }
+  var upTlsName by remember(upstream.serverName) { mutableStateOf(upstream.serverName) }
+  var upOutproxy by remember(upstream.outproxy) { mutableStateOf(upstream.outproxy) }
+  var testTarget by remember { mutableStateOf("") }
+  val testRunning by model.testRunning.collectAsState()
+  val testReport by model.testReport.collectAsState()
 
   Scaffold(topBar = { Header(R.string.proxy_title, onBack = onBack) }) { inner ->
     Column(
@@ -114,16 +121,78 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
             color = MaterialTheme.colorScheme.primary,
         )
         Text(stringResource(R.string.proxy_upstream_body), style = MaterialTheme.typography.bodyMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          UpstreamKind.entries.forEach { kind ->
-            FilterChip(
-                selected = upstream.kind == kind,
-                onClick = {
-                  model.setUpstream(kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed)
-                },
-                label = { Text(kindLabel(kind)) },
+        // Two rows so five choices fit on a phone.
+        listOf(
+                listOf(UpstreamKind.NONE, UpstreamKind.HTTP, UpstreamKind.HTTPS),
+                listOf(UpstreamKind.SOCKS5, UpstreamKind.SAM),
             )
+            .forEach { rowKinds ->
+              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowKinds.forEach { kind ->
+                  FilterChip(
+                      selected = upstream.kind == kind,
+                      onClick = {
+                        // Changing the kind clears a backend that cannot go with it.
+                        val keep =
+                            when (kind) {
+                              UpstreamKind.SOCKS5 -> upstream.backend.takeIf { it == OverlayBackend.TOR }
+                              UpstreamKind.HTTP -> upstream.backend.takeIf { it == OverlayBackend.I2P_HTTP }
+                              UpstreamKind.SAM -> OverlayBackend.I2P_SAM
+                              else -> null
+                            } ?: OverlayBackend.NONE
+                        model.setUpstream(kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed, upTlsName, keep, upOutproxy)
+                      },
+                      label = { Text(kindLabel(kind)) },
+                  )
+                }
+              }
+            }
+        Text(kindHint(upstream.kind), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (upstream.kind == UpstreamKind.HTTPS) {
+          OutlinedTextField(
+              upTlsName,
+              { upTlsName = it },
+              label = { Text(stringResource(R.string.proxy_tls_name)) },
+              supportingText = { Text(stringResource(R.string.proxy_tls_name_help)) },
+              singleLine = true,
+              modifier = Modifier.fillMaxWidth(),
+          )
+        }
+        val backends =
+            when (upstream.kind) {
+              UpstreamKind.SOCKS5 -> listOf(OverlayBackend.NONE, OverlayBackend.TOR)
+              UpstreamKind.HTTP -> listOf(OverlayBackend.NONE, OverlayBackend.I2P_HTTP)
+              else -> emptyList()
+            }
+        if (backends.isNotEmpty()) {
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            backends.forEach { b ->
+              FilterChip(
+                  selected = upstream.backend == b,
+                  onClick = {
+                    model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed, upTlsName, b, upOutproxy)
+                  },
+                  label = { Text(backendLabel(b)) },
+              )
+            }
           }
+        }
+        if (upstream.backend != OverlayBackend.NONE) {
+          Text(
+              stringResource(R.string.proxy_backend_never_direct),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.secondary,
+          )
+        }
+        if (upstream.backend == OverlayBackend.I2P_SAM || upstream.backend == OverlayBackend.I2P_HTTP) {
+          OutlinedTextField(
+              upOutproxy,
+              { upOutproxy = it },
+              label = { Text(stringResource(R.string.proxy_outproxy)) },
+              supportingText = { Text(stringResource(R.string.proxy_outproxy_help)) },
+              singleLine = true,
+              modifier = Modifier.fillMaxWidth(),
+          )
         }
         OutlinedTextField(
             upHost,
@@ -180,9 +249,28 @@ fun ProxyView(onBack: BackNavigation, model: ProxyViewModel = viewModel()) {
           )
         }
         ForcedPathStatus(dnsState, ipv6State)
-        TextButton(onClick = { model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed) }) {
-          Text(stringResource(R.string.proxy_save_upstream))
+        TextButton(
+            onClick = {
+              model.setUpstream(upstream.kind, upHost, upPort, upUser, upPass, upstream.forced, upstream.failClosed, upTlsName, upstream.backend, upOutproxy)
+            }) {
+              Text(stringResource(R.string.proxy_save_upstream))
+            }
+        // Connection test: reachability, TLS, authentication, negotiation, a real request.
+        OutlinedTextField(
+            testTarget,
+            { testTarget = it },
+            label = { Text(stringResource(R.string.proxy_test_target)) },
+            supportingText = { Text(stringResource(R.string.proxy_test_target_help)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          TextButton(enabled = !testRunning && upstream.kind != UpstreamKind.NONE, onClick = { model.runTest(testTarget) }) {
+            Text(stringResource(R.string.proxy_test_run))
+          }
+          if (testRunning) CircularProgressIndicator(Modifier.padding(8.dp))
         }
+        testReport?.let { TestReportView(it) }
       }
 
       message?.let {
@@ -202,8 +290,61 @@ private fun kindLabel(kind: UpstreamKind): String =
     when (kind) {
       UpstreamKind.NONE -> stringResource(R.string.proxy_kind_none)
       UpstreamKind.HTTP -> stringResource(R.string.proxy_kind_http)
+      UpstreamKind.HTTPS -> stringResource(R.string.proxy_kind_https)
       UpstreamKind.SOCKS5 -> stringResource(R.string.proxy_kind_socks5)
+      UpstreamKind.SAM -> stringResource(R.string.proxy_kind_sam)
     }
+
+@Composable
+private fun kindHint(kind: UpstreamKind): String =
+    when (kind) {
+      UpstreamKind.NONE -> ""
+      UpstreamKind.HTTP -> stringResource(R.string.proxy_hint_http)
+      UpstreamKind.HTTPS -> stringResource(R.string.proxy_hint_https)
+      UpstreamKind.SOCKS5 -> stringResource(R.string.proxy_hint_socks5)
+      UpstreamKind.SAM -> stringResource(R.string.proxy_hint_sam)
+    }
+
+@Composable
+private fun backendLabel(b: OverlayBackend): String =
+    when (b) {
+      OverlayBackend.NONE -> stringResource(R.string.proxy_backend_plain)
+      OverlayBackend.TOR -> stringResource(R.string.proxy_backend_tor)
+      OverlayBackend.I2P_SAM -> stringResource(R.string.proxy_backend_i2p_sam)
+      OverlayBackend.I2P_HTTP -> stringResource(R.string.proxy_backend_i2p_http)
+    }
+
+@Composable
+private fun TestReportView(report: com.tailscale.ipn.ui.viewModel.ProxyTestReport) {
+  Text(
+      stringResource(R.string.proxy_test_result),
+      style = MaterialTheme.typography.labelLarge,
+      fontWeight = FontWeight.SemiBold,
+  )
+  report.error?.let {
+    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+    return
+  }
+  report.steps.forEach { s ->
+    val mark = if (s.skipped) "–" else if (s.ok) "✓" else "✗"
+    Text(
+        "$mark ${s.stage}: ${s.detail}" + if (!s.skipped && s.ms > 0) " (${s.ms} ms)" else "",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (!s.skipped && !s.ok) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+    )
+  }
+  Text(
+      if (report.passed) stringResource(R.string.proxy_test_ok) else stringResource(R.string.proxy_test_failed_at, report.verdict),
+      style = MaterialTheme.typography.bodyMedium,
+      fontWeight = FontWeight.SemiBold,
+  )
+  report.isTor?.let {
+    Text(
+        if (it) stringResource(R.string.proxy_test_is_tor) else stringResource(R.string.proxy_test_not_tor),
+        style = MaterialTheme.typography.bodySmall,
+    )
+  }
+}
 
 @Composable
 private fun ForcedPathStatus(dns: ForcedDNSStatus, ipv6: ForcedIPv6Status) {

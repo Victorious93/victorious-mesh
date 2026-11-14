@@ -234,6 +234,34 @@ func (c *Controller) invalidateAll() {
 // VMap exposes the mapping for stats.
 func (c *Controller) MappingCount() int { return c.vmap.Len() }
 
+// ParseURI reads a proxy URI (http, https, socks5, socks5h, sam) with the
+// same strict rules as everywhere else: explicit port 1-65535, bracketed
+// IPv6, percent-decoded credentials. The reply carries the password only
+// as "hasPassword"; the caller already holds the URI it typed.
+func (c *Controller) ParseURI(raw string) string {
+	cfg, err := upstreamproxy.ParseProxyURI(raw)
+	if err != nil {
+		return errJSON(err.Error())
+	}
+	return mustJSON(map[string]any{
+		"kind": string(cfg.Kind), "host": cfg.Host, "port": cfg.Port, "username": cfg.Username,
+		"password": cfg.Password, "backend": string(cfg.Backend),
+	})
+}
+
+// RedactURI renders a profile as a URI with the password removed.
+func (c *Controller) RedactURI(proxyJSON string) string {
+	var pj ProxyJSON
+	if err := json.Unmarshal([]byte(proxyJSON), &pj); err != nil {
+		return ""
+	}
+	cfg, err := pj.Config()
+	if err != nil {
+		return ""
+	}
+	return upstreamproxy.RedactProxyURI(cfg, true)
+}
+
 // ----------------------------------------------------------- proxy test
 
 // TargetJSON selects what the forwarding stage requests.
@@ -429,8 +457,17 @@ func (c *Controller) DNSQuery(profileJSON, name, qtype, optsJSON string) string 
 	defer cancel()
 	res := c.resolve.Query(ctx, p, name, qt, dnstools.Options{DNSSEC: o.DNSSEC, NoCache: o.NoCache})
 	c.hist.Add(res)
-	return mustJSON(res)
+	return mustJSON(textual(res))
 }
+
+// withText adds the dig-like rendering so the UI can show and copy it
+// without re-implementing the format.
+type withText struct {
+	*dnstools.Result
+	Text string `json:"text"`
+}
+
+func textual(r *dnstools.Result) withText { return withText{Result: r, Text: r.Text()} }
 
 // DNSReverse resolves an IPv4/IPv6 address to its PTR name.
 func (c *Controller) DNSReverse(profileJSON, ip string) string {
@@ -464,10 +501,17 @@ func (c *Controller) DNSCompare(profilesJSON, name, qtype string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmp := c.resolve.Compare(ctx, ps, name, qt, dnstools.Options{})
+	view := struct {
+		Results []withText `json:"results"`
+		Agree   bool       `json:"agree"`
+		Fastest string     `json:"fastest,omitempty"`
+		Summary string     `json:"summary"`
+	}{Agree: cmp.Agree, Fastest: cmp.Fastest, Summary: cmp.Summary}
 	for _, r := range cmp.Results {
 		c.hist.Add(r)
+		view.Results = append(view.Results, textual(r))
 	}
-	return mustJSON(cmp)
+	return mustJSON(view)
 }
 
 func (c *Controller) DNSLatency(profileJSON, name, qtype string, samples int) string {

@@ -53,6 +53,7 @@ fun PerNetworkDnsView(onBack: BackNavigation, model: PerNetworkDnsViewModel = vi
   val active by model.active.collectAsState()
   val network by model.network.collectAsState()
   val paused by model.paused.collectAsState()
+  val effective by model.effective.collectAsState()
   var hasLocation by remember { mutableStateOf(PerNetworkDns.hasLocationPermission(ctx)) }
   val askLocation =
       rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -104,11 +105,19 @@ fun PerNetworkDnsView(onBack: BackNavigation, model: PerNetworkDnsViewModel = vi
                 else -> stringResource(R.string.pndns_net_other)
               }
           Text(where, style = MaterialTheme.typography.bodySmall)
+          // One honest line about what is happening now: never "in use" for rules that are paused.
           Text(
-              active?.let { stringResource(R.string.pndns_active, it.servers.joinToString(", ")) }
-                  ?: stringResource(R.string.pndns_active_none),
+              when (effective.effect) {
+                com.tailscale.ipn.dns.DnsEffect.ACTIVE ->
+                    stringResource(R.string.pndns_active, (effective.rule ?: active)?.servers?.joinToString(", ").orEmpty())
+                com.tailscale.ipn.dns.DnsEffect.PAUSED_FORCED_PROXY -> stringResource(R.string.pndns_not_applied)
+                com.tailscale.ipn.dns.DnsEffect.NO_VALID_RULES -> stringResource(R.string.pndns_no_valid_rules)
+                else -> stringResource(R.string.pndns_active_none)
+              },
               style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.secondary,
+              color =
+                  if (effective.effect == com.tailscale.ipn.dns.DnsEffect.PAUSED_FORCED_PROXY) MaterialTheme.colorScheme.error
+                  else MaterialTheme.colorScheme.secondary,
           )
         }
       }

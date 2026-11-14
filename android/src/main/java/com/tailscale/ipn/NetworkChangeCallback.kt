@@ -206,6 +206,10 @@ object NetworkChangeCallback {
     return false
   }
 
+  /** The default network's own DNS servers (before any per-network override), space separated. */
+  fun currentDnsServers(): String =
+      lock.withLock { cachedDefaultNetworkInfo?.linkProps?.dnsServers?.joinToString(" ") { it.hostAddress.orEmpty() }.orEmpty() }
+
   // maybeUpdateDNSConfig will maybe update our DNS configuration based on the
   // current set of active Networks.
   private fun maybeUpdateDNSConfig(why: String, dns: DnsConfig) {
@@ -224,6 +228,12 @@ object NetworkChangeCallback {
     val sb = StringBuilder()
     for (ip in info.linkProps.dnsServers) {
       sb.append(ip.hostAddress).append(" ")
+    }
+    // The DNS tools' "Network DNS" profile follows the real network; cached answers from the
+    // previous network's resolver must not be served on the new one.
+    runCatching {
+      Libtailscale.setSystemDNSServers(sb.toString())
+      Libtailscale.dnsClearCache()
     }
 
     val searchDomains: String? = info.linkProps.domains

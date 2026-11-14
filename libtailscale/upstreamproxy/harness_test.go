@@ -201,8 +201,16 @@ type socksProxy struct {
 }
 
 func startSOCKS(t testing.TB, user, pass string, route map[string]string) *socksProxy {
+	return startSOCKSOn(t, "127.0.0.1:0", route, user, pass)
+}
+
+func startSOCKSOn(t testing.TB, addr string, route map[string]string, creds ...string) *socksProxy {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	var user, pass string
+	if len(creds) == 2 {
+		user, pass = creds[0], creds[1]
+	}
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}

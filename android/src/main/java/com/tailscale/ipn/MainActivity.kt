@@ -451,6 +451,7 @@ class MainActivity : ComponentActivity() {
               composable("bugReport") { BugReportView(backTo("settings")) }
               composable("dnsSettings") { DNSSettingsView(backTo("settings")) }
               composable("perNetworkDns") { PerNetworkDnsView(backTo("settings")) }
+              composable("dnsTools") { com.tailscale.ipn.ui.view.DnsToolsView(backTo("settings")) }
               composable("splitTunneling") { SplitTunnelAppPickerView(backTo("settings")) }
               composable("tailnetLock") { TailnetLockSetupView(backTo("settings")) }
               composable("subnetRouting") { SubnetRoutingView(backTo("settings")) }

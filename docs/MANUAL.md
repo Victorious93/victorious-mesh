@@ -120,11 +120,11 @@ Pick which DNS servers the mesh resolver asks, depending on the network the phon
 
 1. Turn on **Use per-network DNS**.
 2. Add a rule: **Named Wi-Fi** (type the Wi-Fi name), **Any other Wi-Fi**, or **Mobile data**, plus 1 to 4 DNS server IP addresses (for example `1.1.1.1, 9.9.9.9`, or a mesh Pi-hole's mesh IP).
-3. The screen shows the current network and which servers are in use.
+3. The screen shows the current network and one honest status line: **In use** (a rule matches and is applied), **no rule matches** (the network's own DNS is used), **nothing applies yet** (no rule is complete), or **NOT in use** (rules exist but are paused, see below). A rule never looks active while it is being ignored.
 
 A named Wi-Fi rule wins over **Any other Wi-Fi**. Only IP addresses are accepted (no host names). `100.100.100.100`, loopback, and multicast are refused.
 
-**Safety.** This only swaps which upstream servers the mesh resolver forwards to. It adds no route and no bypass, so the kill switch, fail-closed, and per-app blocking work exactly as before. **It pauses itself while the forced proxy (Force all traffic) is on**, so forced-proxy DNS is left exactly as the Proxy settings make it.
+**Safety.** This only swaps which upstream servers the mesh resolver forwards to. It adds no route and no bypass, so the kill switch, fail-closed, and per-app blocking work exactly as before. **It is deliberately NOT applied while the forced proxy (Force all traffic) is on.** The screen then says so in red. The reason: the mesh engine's own UDP lookups to the servers in a rule use protected sockets that bypass the proxy, so applying the rule would let DNS go around it. While the forced proxy is on, DNS follows the Proxy settings (through the proxy, fail-closed). Turn the forced proxy off to use the rules. **[Certain]** about the behaviour in code; **[not device-verified]** on a phone.
 
 **Limits.**
 - It needs **Use Victorious Mesh DNS** turned on in DNS settings; otherwise it has no effect. **[Likely]**
@@ -133,6 +133,26 @@ A named Wi-Fi rule wins over **Any other Wi-Fi**. Only IP addresses are accepted
 - Which servers answer is up to the mesh resolver; lookups to these servers leave the phone the same way mesh DNS lookups always do. **[Likely]**
 
 There is **no fleet operation** for this.
+
+### DNS tools
+
+**Settings → DNS tools.** Nothing runs until you tap a button. History is **off** by default.
+
+**Resolver profiles.** Built in: **Network DNS** (the servers the current network handed out, plain DNS on the direct route) and **Mesh / MagicDNS + split DNS** (100.100.100.100, through the mesh, allowed to see private names). You can add your own: **UDP**, **TCP**, **DNS over TLS** (port 853) or **DNS over HTTPS** (an `https://` URL), each with an explicit **route** — *direct* (outside the VPN), *mesh*, *proxy* (the forced proxy) or *Tor* — and optional **Certificate name** and **Bootstrap IPs**. Profiles can be edited, duplicated and deleted.
+
+- **Certificates are always verified** for DoT and DoH, against the name you set (default the server's host). A failure ends the lookup; **there is no plaintext retry**.
+- **Bootstrap.** A DoT/DoH server given as a host name needs **bootstrap IP addresses**, or the route must be a proxy/Tor (the far end then resolves the name). The app **never looks the host name up with any other DNS** (not the system's, not your ISP's); without bootstrap IPs the profile is refused.
+- **If a route is unavailable the lookup fails.** It is never rerouted to another route.
+- **Lookups:** A, AAAA, CNAME, MX, NS, TXT, SOA, PTR, SRV, CAA, plus **reverse lookups** for IPv4 and IPv6 (type PTR with an IP). The result shows the response code, flags, answer / authority / additional sections with TTLs, query time, resolver, transport, route, whether it came from the cache, and a truncation retry over TCP if one happened. **Copy** puts the text (or JSON) on the clipboard.
+- **DNSSEC (tick "DNSSEC").** The app asks for DNSSEC data and reports what it got: whether the **resolver claims** it validated the answer (the AD flag), how many signatures came back, and whether the path to the resolver is authenticated (DoT/DoH only). **This app does not validate DNSSEC itself**; an AD flag over plain UDP could be forged and the report says so.
+- **Cache.** Answers are cached by their TTL, and negative answers (name does not exist / no such record) for the zone's SOA minimum (at most 15 minutes). SERVFAIL, REFUSED and truncated answers are never cached. Each profile has its own cache, so a mesh answer is never given for a public profile. **Clear cache** empties it; it is also emptied when the proxy/Tor/I2P profile changes and on a network change.
+- **Compare resolvers** asks 2–8 profiles the same question (uncached, in parallel) and shows who answered, how fast, and whether they agree. Disagreement can be normal (CDNs, split DNS). **Latency** does five uncached lookups against one profile and shows min/median/max.
+- **Local rules** (affect the DNS tools only, not other apps): *host mappings* (`nas.lan 192.168.1.10`), *block* patterns and *allow* patterns (`example.com` exact, `*.example.com` subdomains only; allow beats block). A mapped name is answered locally with no network traffic.
+- **History** (off by default): when you turn it on, the last 100 lookups are kept in memory only; turning it off erases it.
+- **Private names do not leak.** A **.onion** or **.i2p** name, or a **.local / .home.arpa / .internal / .lan** name, or a reverse lookup of a private/mesh address, is **refused** by any profile that is not marked private, before anything is sent. Public profiles never see them. **Headscale's DNS routes, private zones, search domains and peer names are not touched**: this screen only runs lookups, it does not change the mesh DNS configuration.
+- **I2P naming** is a separate diagnostic on the Proxy screen (router address book), not part of public DNS.
+
+**Always-on guard.** DNS queries for `.onion` / `.i2p` that pass through the VPN (to the mesh resolver or any other server) are answered on the phone and never forwarded, whether or not a proxy is configured. This covers plain UDP port-53 queries only: **TCP port-53 queries and DNS over TLS/HTTPS used by an app itself cannot be inspected**, and apps that bring their own encrypted DNS are outside this protection. **[Certain]** about the packet path in tests; **[not device-verified]** end to end on a phone.
 
 ### WireGuard
 
@@ -319,6 +339,88 @@ When this is on, the last tunnel mode (mesh, or the last WireGuard profile) star
 
 **Limits.** Android 12 and newer may block a start from boot. **Always-on VPN** in Android settings is more reliable for that. This does not start before the first unlock. It does not start if you have never granted VPN permission (`isAbleToStartVPN` is false). Turning the main switch off still disconnects; the next app open or reboot will start again while this setting is on. There is **no fleet operation** for this.
 
+#### Proxy kinds, ports and what is enforced
+
+**Settings → Proxy → Send this phone through an upstream proxy.** Pick one kind:
+
+| Kind | What it is | Enforced? |
+| --- | --- | --- |
+| HTTP | HTTP CONNECT over **plain TCP** to the proxy. Username and password go to the proxy unencrypted. | Advisory on Android 10+ (apps may ignore it); enforced with **Force all traffic** |
+| HTTPS | HTTP CONNECT **inside TLS** to the proxy. The proxy's certificate must be valid for its name (**Certificate name**, default the host). A certificate error stops the connection; it is **never retried without TLS** and verification cannot be switched off. | Only with **Force all traffic** (Android's own proxy setting cannot do TLS to the proxy) |
+| SOCKS5 | SOCKS5 with host names passed to the proxy (the proxy resolves them). | Only with **Force all traffic** |
+| I2P SAM | An I2P router's SAM v3 bridge, TCP streams only. | Only with **Force all traffic** |
+
+- **Remote proxy ports may be 1–65535.** Only the port you *share* this phone's own proxy on keeps the 1024–65535 limit (it is a local listener).
+- **Advisory vs enforced.** "Advisory" means Android is *asked* to use a proxy and apps may ignore it. "Enforced" means the app's TCP is carried through the proxy by this app's own packet path, so it cannot be ignored. The screen's hint under the kind says which applies.
+- **Test connection.** Enter a target (for example `example.com`) and tap **Test connection**. It reports each stage separately: *reachability* (TCP to the proxy), *tls* (certificate check, https only), *authentication*, *negotiation* (the proxy speaks the protocol) and *forwarding* (a real HTTP request crossed the proxy and got a reply). A reachable port is never reported as success. **[Certain]** about the stages in tests against local fake servers; **[not device-verified]**.
+- **UDP and IPv6 under a proxy.** HTTP, HTTPS, SAM and Tor carry TCP only: UDP is **blocked**, not sent around the proxy. SOCKS5 UDP works only if the proxy supports UDP ASSOCIATE. IPv6 is blocked if the proxy cannot carry it. ICMP is dropped.
+- **Saved proxies** (Per-app routing → Saved proxies) have the same fields; an https proxy stays https (a bug where an unknown kind was silently sent as SOCKS5 is fixed). **Duplicate**, edit and delete are available. Credentials are in encrypted storage only. **Exports and logs never contain a password or a user name** (they show only "credentials: set").
+- **URIs.** `http://`, `https://`, `socks5://`, `socks5h://` and `sam://` URIs with an explicit port 1–65535, bracketed IPv6 (`socks5://[2001:db8::1]:1080`) and percent-encoded credentials are understood by the core's parser; nothing else is accepted.
+
+#### Tor
+
+Tor needs a **Tor service on the phone or on a mesh node**; this app does not embed Tor. **[Certain]** — it deliberately uses an external service: embedding tor (C, or the Go `bine`/`tor` wrappers) was not adopted because it would add a second large native library per ABI to the APK, run a second network stack inside the VPN process, and needs its own socket-protect handling; none of that could be verified here.
+
+Setup (either one):
+
+1. **Orbot** (Guardian Project) in its **SOCKS-only / "no VPN"** mode, SOCKS port usually `127.0.0.1:9050`. Orbot must **not** be set to route all traffic by its own VPN: Android allows only **one VPN at a time** and Mesh must keep it. **[Likely]** about Orbot's port and mode names; check Orbot's own screen.
+2. A **tor** daemon you run on a mesh node or Termux, with a `SocksPort` bound to the mesh IP (a mesh-hosted gateway you own) or to loopback.
+
+In **Settings → Proxy**, choose **SOCKS5**, host and port as above, then the **Tor** chip, and turn on **Force all traffic**. Then:
+
+- Selected TCP goes to Tor. **Host names reach Tor unresolved** (SOCKS ATYP 3). Tor never falls back to a direct connection, whatever the fail-closed switch says; if Tor is down, matching traffic is blocked. **[Certain]** in tests against a fake Tor SOCKS server.
+- **`.onion` names.** A valid **v3** address is required (56-character label with a correct checksum; retired v2 addresses and bad checksums are refused). DNS queries for `.onion` are **answered on the phone and never sent to any DNS server**, even when no proxy is set. Because a VPN flow only has a destination IP, the answer is a **virtual address** from `198.18.0.0/15`; when the app then connects to it, the name is recovered from a bounded table (2048 names, 10-minute expiry) and handed to Tor **by name**. Expired or invalidated mappings **fail closed** (the connection is refused). The table is dropped whenever the proxy profile changes or is turned off. **[Certain]** in real-stack tests; **[not device-verified]**.
+- **Public names under Tor** keep going through the mesh resolver (so split DNS and peer names still work); its outside lookups go through Tor as TCP. Names are not rewritten to virtual addresses, so Tor sees an IP, not the name, for ordinary sites. Use the app's own SOCKS settings if you need name-based circuits for them.
+- **UDP is blocked** under a Tor profile (Tor does not carry UDP). DNS over TLS (port 853) is also refused while Tor/I2P is required, because its query names cannot be checked.
+- **Status you can trust:** the connection test; if the target is `check.torproject.org`, the page shows what the Tor Project's service says (`IsTor`). The app does **not** show bootstrap percentages, circuits or "new identity": those need Tor's ControlPort, which is not wired up, and a circuit change would not guarantee a new identity anyway. They are intentionally absent rather than invented.
+
+#### I2P
+
+You need an **I2P router** (for example i2pd or Java I2P) on the phone, Termux, or a mesh node, with the **SAM bridge enabled** (default port 7656; it is often off by default).
+
+In **Settings → Proxy**, choose **I2P SAM**, host and port of the SAM bridge, and turn on **Force all traffic**. Then:
+
+- `.i2p` and `.b32.i2p` names are resolved **by the router** (address book, SAM `STREAM CONNECT` by name). Like `.onion`, their DNS queries are answered on the phone with virtual addresses and **never go to public DNS**.
+- The app speaks SAM v3.0–3.3 (HELLO version negotiation), keeps **one long-lived session** (transient destination), creates it when the first connection needs it (up to **3 minutes**, because a fresh router needs time to build tunnels), re-creates it if the router restarts, answers the router's keepalive PINGs, allows at most **64** open streams, and cancels cleanly. Errors come with the router's own reason (for example *CANT_REACH_PEER*, *unknown name*, *no SAM 3.x*).
+- **Test connection** with a `.i2p` name makes a real HTTP request over an I2P stream. The first one can take minutes. **[Certain]** in tests against a fake SAM router; **no live I2P network was used**.
+- **Clearnet** is refused unless you set an **I2P outproxy**. For SAM it is the outproxy's `.i2p` name (it must speak HTTP CONNECT) and clearnet connections go to it over I2P. There is no fallback to a direct connection if it is unavailable. The **I2P HTTP proxy** kind (usually 4444) works for HTTP; whether it can carry other protocols depends on your router and is **unverified**; clearnet through it only if you assert (by filling the outproxy box) that your router has an outproxy set.
+- **I2P naming diagnostics** (SAM `NAMING LOOKUP`) are separate from DNS: they ask the router's address book only.
+- I2P is **not** a general VPN: no UDP, no ICMP, and not every router supports every feature.
+
+#### Where the proxy server is (routing)
+
+- A proxy on a **mesh address** is reached through the mesh (a mesh-hosted gateway you own).
+- A proxy on **loopback** (Orbot, i2pd on the phone) is reached on loopback, no VPN route needed.
+- A proxy on a **public or LAN IP** is excluded from the VPN with a single `/32` (or `/128`) route so the phone can reach it; a **host name** is resolved and those addresses are excluded and re-checked every few minutes and after a failed connection. App traffic is never broadly exempted. If a socket cannot be protected from the VPN, the connection is refused rather than looped.
+
+#### Routing examples and recovery
+
+**Examples** (all need **Force all traffic** in Settings → Proxy):
+
+1. *Everything through Tor with Orbot:* Orbot in SOCKS-only mode → Proxy: **SOCKS5**, host `127.0.0.1`, port `9050`, chip **Tor** → Force all traffic on → **Test connection** with `check.torproject.org`. Mesh addresses stay on the mesh; other TCP goes through Tor; UDP is blocked.
+2. *Tor through a gateway you run on a mesh node:* host = that node's mesh IP, port = its `SocksPort`. The mesh carries the hop; there is no route exclusion and no loop.
+3. *One app through a corporate HTTPS proxy:* Per-app routing → Saved proxies → **HTTPS CONNECT (TLS)**, host `proxy.corp.example`, port `443` → give that app the **Upstream proxy** choice. Other apps are unaffected.
+4. *I2P sites:* i2pd/Java I2P with SAM enabled → Proxy: **I2P SAM**, `127.0.0.1:7656` → Force all traffic → open `http://something.i2p` in a browser (the name is answered on the phone and the stream is made by your router).
+5. *Which resolver sees what:* DNS tools → add a **DoT** profile with bootstrap IPs, route **direct**, and compare it against **Mesh / MagicDNS**.
+
+**Recovery.**
+
+- *No internet after turning on a proxy:* the proxy or Tor/I2P is down and the profile is fail-closed on purpose. Open Settings → Proxy and turn **Force all traffic** off (or fix the proxy) and reconnect. The kill switch is a separate setting and is not changed by these screens.
+- *A profile is rejected:* the screen says "Not saved: …" with the reason (for example a bad port, a TLS name on a non-HTTPS proxy, or Tor on an HTTP proxy). Nothing half-applied is left active: a rejected forced profile clears the forced path.
+- *Tor/I2P status looks stuck:* run **Test connection**; the failing stage is named (reachability = nothing listening; negotiation = wrong kind of port, for example an HTTP proxy port given as SAM; forwarding = the network behind it, such as a not-yet-ready I2P router). A first I2P test can take minutes.
+- *Stale DNS or mappings:* DNS tools → **Clear cache**. Turning the proxy off, changing it, or a network change also empties the DNS cache and the virtual-address table.
+- *`.onion` / `.i2p` guard:* turn it off in DNS tools only if you understand that those names can then reach your DNS servers when no Tor/I2P profile is forced.
+- *After a router or Orbot restart:* nothing to do. The next connection builds a new I2P session; Tor connections simply work again once the port is up.
+
+**Limitations (what this does not do).**
+
+- It does not embed Tor or I2P, and no live Tor or I2P network has been used to test it.
+- Apps that bring their own encrypted DNS (DoH/DoT), use TCP DNS, or hard-code addresses are not covered by name-based protection; under Tor/I2P their traffic still goes to the backend by IP, and DoT (port 853) is refused.
+- Domain-based routing is **not** offered: from a VPN flow the app only sees an IP, and an IP shared by a CDN does not identify a site. Only names this app itself answered (`.onion`, `.i2p`) are used as trusted names.
+- Per-app attribution needs Android 10+; if the owner of a flow cannot be found, strict per-app rules block it and otherwise it follows the device-wide default.
+- DNS tools' DoT/DoH profiles are for the tools only. The per-network DNS rules still take plain IP servers because that is what the mesh resolver accepts.
+- Nothing here has been run on a phone or emulator; see the **[not device-verified]** tags.
+
 ### Leak checker
 
 ![Leak checker](images/manual/leak-checker.png)
@@ -329,15 +431,17 @@ When this is on, the last tunnel mode (mesh, or the last WireGuard profile) star
 
 **Off by default** — nothing runs until you tap **Run check**. **[not device-verified]**
 
-The report covers this app only:
+Each line says what **kind of evidence** it rests on:
 
-1. Whether the VPN is up.
-2. Whether the kill switch is on.
-3. How many apps are set to **Direct** (those skip the tunnel on purpose).
-4. Mesh DNS on or off.
-5. A public IP from the URL in **Settings → Per-app routing** (this app's path, not another app's). The URL must be **https**; a plain `http://` URL is refused and the report says so.
+- **Configuration** — what your settings say should happen (VPN up, kill switch on, proxy fail-closed, mesh DNS, Tor/I2P required but not reachable, per-network DNS rules that are *not* being applied, number of Direct apps). This can never prove behaviour, so it never says "verified".
+- **Observed** — something was actually seen. The public-IP check is observed, but only for **this app's** path, and it says **nothing about DNS**.
+- **Verified** — the **DNS observation test**: this app looks up a unique random name under a zone you control, then asks your observation service which resolver addresses asked for it. It passes only if the service saw the query and every address it saw is one you listed as expected; it **fails** if the query came from anywhere else; and it is **inconclusive** if the service saw nothing (a drop and a miss look the same), if no observation service is set, or if there is no expected list to compare to.
 
-**Limits.** This cannot prove other apps are leak-free. WebRTC/STUN, IPv6 bypass, and sockets opened before the VPN are not tested. There is **no fleet operation** for this.
+**Missing measurement is "inconclusive", never "passed".** The headline says *inconclusive — not a clean bill of health* until a DNS observation test passes.
+
+**Observation service.** You need a host you control that is the authoritative name server for a zone (for example `leak.example.org`) and records which source addresses asked for each label, plus an `https://` endpoint that answers `GET ?token=<label>` with `{"resolvers":["203.0.113.5"]}`. The core includes a reference fixture used in its tests (`leakcheck.FixtureServer`). **No public observation service is shipped or assumed.**
+
+**Limits.** This cannot prove other apps are leak-free. WebRTC/STUN, IPv6 outside the tunnel, other apps' own encrypted DNS, and sockets opened before the VPN are not tested. There is **no fleet operation** for this.
 
 ### VictorGPS stub
 

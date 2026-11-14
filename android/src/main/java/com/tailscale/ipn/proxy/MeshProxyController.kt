@@ -25,6 +25,8 @@ import com.tailscale.ipn.util.TSLog
 import com.tailscale.ipn.wireguard.EncryptedPrefsSecretStore
 import com.tailscale.ipn.wireguard.WireGuardManager
 import com.victorious.mesh.R
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import libtailscale.Libtailscale
 
 /** Starts/stops the mesh-bound SOCKS5 + HTTP CONNECT listeners. Off by default. */
@@ -103,33 +105,63 @@ object MeshProxyController {
         false
       }
 
+  /**
+   * The always-on .onion / .i2p DNS guard. On by default: those names are answered on
+   * the phone and never forwarded to any resolver. Stored with the other proxy settings.
+   */
+  fun reservedGuardEnabled(): Boolean =
+      EncryptedPrefsSecretStore(App.get().getEncryptedPrefs()).get("dns.guard") != "0"
+
+  fun setReservedGuard(on: Boolean) {
+    EncryptedPrefsSecretStore(App.get().getEncryptedPrefs()).put("dns.guard", if (on) "1" else "0")
+    runCatching { Libtailscale.setReservedNameGuard(on) }
+  }
+
   fun syncForced(ctx: Context) {
+    runCatching { Libtailscale.setReservedNameGuard(reservedGuardEnabled()) }
     val cfg = store(ctx).upstream()
     if (WireGuardManager.isWireGuardActive() || !cfg.forced || cfg.kind == UpstreamKind.NONE || cfg.host.isBlank()) {
       clearForced()
       return
     }
-    if (!ProxyPlanner.validPort(cfg.port) || !ProxyPlanner.authComplete(cfg.username, cfg.password)) {
+    if (!ProxyPlanner.validRemotePort(cfg.port) || !ProxyPlanner.authComplete(cfg.username, cfg.password)) {
       TSLog.w(TAG, "forced upstream rejected: port or auth")
       clearForced()
       return
     }
-    val kind =
-        when (cfg.kind) {
-          UpstreamKind.HTTP -> "http"
-          UpstreamKind.SOCKS5 -> "socks5"
-          UpstreamKind.NONE -> ""
-        }
     try {
-      Libtailscale.setForcedUpstream(kind, cfg.host, cfg.port, cfg.username, cfg.password, cfg.failClosed)
-      noteForced(if (kind == "http") "HTTP" else "SOCKS5")
+      Libtailscale.setForcedUpstreamJSON(forcedProfileJson(cfg))
+      noteForced(cfg.backend.takeIf { it != OverlayBackend.NONE }?.wire ?: cfg.kind.wire.uppercase())
     } catch (e: Exception) {
+      // Fail closed: a rejected profile must not leave an older one half-applied.
       TSLog.e(TAG, "forced upstream: ${e.message}")
+      lastError = e.message
       clearForced()
     }
     // Per-network DNS pauses while the forced proxy is on; re-check it.
     runCatching { NetworkChangeCallback.reapplyDns("forcedProxy") }
   }
+
+  /** DNS servers of the underlying network, space separated, as the core's "Network DNS" profile needs. */
+  fun currentNetworkDnsServers(): String = com.tailscale.ipn.NetworkChangeCallback.currentDnsServers()
+
+  /** Last reason the forced profile was rejected by the core, for the UI. */
+  @Volatile var lastError: String? = null
+
+  /** The profile as JSON for the Go core. Contains the password: never log it. */
+  fun forcedProfileJson(cfg: UpstreamProxyConfig): String =
+      buildJsonObject {
+            put("kind", cfg.kind.wire)
+            put("host", cfg.host.trim())
+            put("port", cfg.port)
+            if (cfg.username.isNotEmpty()) put("username", cfg.username)
+            if (cfg.password.isNotEmpty()) put("password", cfg.password)
+            put("failClosed", cfg.failClosed)
+            if (cfg.serverName.isNotBlank()) put("serverName", cfg.serverName.trim())
+            if (cfg.backend != OverlayBackend.NONE) put("backend", cfg.backend.wire)
+            if (cfg.outproxy.isNotBlank()) put("outproxy", cfg.outproxy.trim())
+          }
+          .toString()
 
   @Volatile private var lastForced: String? = null
 

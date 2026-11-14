@@ -16,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +42,8 @@ fun LeakCheckerView(
 ) {
   val findings by model.findings.collectAsState()
   val checking by model.checking.collectAsState()
+  val headline by model.headline.collectAsState()
+  val observer by model.observer.collectAsState()
 
   Scaffold(topBar = { Header(R.string.leakcheck_title, onBack = onBack) }) { inner ->
     Column(
@@ -59,7 +65,20 @@ fun LeakCheckerView(
               )
           )
         }
+        headline?.let {
+          Text(it.second, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+              color = if (it.first == LeakSeverity.FAIL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+        }
         findings.forEach { FindingRow(it) }
+        var zone by remember(observer) { mutableStateOf(observer.zone) }
+        var endpoint by remember(observer) { mutableStateOf(observer.endpoint) }
+        var expected by remember(observer) { mutableStateOf(observer.expected) }
+        Text(stringResource(R.string.leakcheck_obs_heading), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.leakcheck_obs_body), style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(zone, { zone = it }, label = { Text(stringResource(R.string.leakcheck_obs_zone)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(endpoint, { endpoint = it }, label = { Text(stringResource(R.string.leakcheck_obs_endpoint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(expected, { expected = it }, label = { Text(stringResource(R.string.leakcheck_obs_expected)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextButton(onClick = { model.saveObserver(zone, endpoint, expected) }) { Text(stringResource(R.string.leakcheck_obs_save)) }
         Text(
             stringResource(R.string.leakcheck_limits),
             style = MaterialTheme.typography.bodySmall,
@@ -77,15 +96,23 @@ private fun FindingRow(finding: LeakFinding) {
         LeakSeverity.OK -> MaterialTheme.colorScheme.primary
         LeakSeverity.WARN -> MaterialTheme.colorScheme.tertiary
         LeakSeverity.FAIL -> MaterialTheme.colorScheme.error
+        LeakSeverity.INCONCLUSIVE -> MaterialTheme.colorScheme.onSurfaceVariant
       }
   val label =
       when (finding.severity) {
         LeakSeverity.OK -> stringResource(R.string.leakcheck_ok)
         LeakSeverity.WARN -> stringResource(R.string.leakcheck_warn)
         LeakSeverity.FAIL -> stringResource(R.string.leakcheck_fail)
+        LeakSeverity.INCONCLUSIVE -> stringResource(R.string.leakcheck_inconclusive)
+      }
+  val evidence =
+      when (finding.evidence) {
+        com.tailscale.ipn.leakcheck.LeakEvidence.CONFIGURATION -> stringResource(R.string.leakcheck_ev_config)
+        com.tailscale.ipn.leakcheck.LeakEvidence.OBSERVED -> stringResource(R.string.leakcheck_ev_observed)
+        com.tailscale.ipn.leakcheck.LeakEvidence.VERIFIED -> stringResource(R.string.leakcheck_ev_verified)
       }
   Text(
-      "$label · ${finding.detail}",
+      "$label [$evidence] · ${finding.detail}",
       style = MaterialTheme.typography.bodyMedium,
       color = color,
   )

@@ -168,6 +168,13 @@ fun SettingsView(
 
       Lists.ItemDivider()
       Setting.Text(
+          R.string.dnstools_title,
+          subtitle = stringResource(R.string.dnstools_settings_subtitle),
+          onClick = { settingsNav.onNavigateToRoute("dnsTools") },
+      )
+
+      Lists.ItemDivider()
+      Setting.Text(
           R.string.leakcheck_title,
           subtitle = stringResource(R.string.leakcheck_settings_subtitle),
           onClick = settingsNav.onNavigateToLeakChecker,

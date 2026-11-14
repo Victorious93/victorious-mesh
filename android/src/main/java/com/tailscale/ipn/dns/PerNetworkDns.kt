@@ -32,6 +32,24 @@ data class DnsRule(
 @Serializable
 data class PerNetworkDnsConfig(val enabled: Boolean = false, val rules: List<DnsRule> = emptyList())
 
+enum class DnsEffect {
+  /** The switch is off. */
+  DISABLED,
+  /** On, but no rule is complete and valid. */
+  NO_VALID_RULES,
+  /** A rule matches the current network and is applied. */
+  ACTIVE,
+  /** On, valid rules exist, but none matches the current network. */
+  NO_MATCH,
+  /** On, but deliberately NOT applied because the forced proxy is on. */
+  PAUSED_FORCED_PROXY,
+}
+
+data class EffectiveDns(val effect: DnsEffect, val rule: DnsRule?) {
+  /** True only when the user's servers are really in use. */
+  val applied: Boolean get() = effect == DnsEffect.ACTIVE
+}
+
 /** What the phone's underlying (non-VPN) network is right now. */
 data class CurrentNetwork(val wifi: Boolean, val cellular: Boolean, val ssid: String?)
 
@@ -128,6 +146,20 @@ object PerNetworkDnsPlanner {
     if (net.cellular) return valid.firstOrNull { it.match == DnsMatch.CELLULAR }
     return null
   }
+
+  /**
+   * What the rules are actually doing right now, so no setting can look active
+   * while being ignored.
+   */
+  fun effective(c: PerNetworkDnsConfig, net: CurrentNetwork, forcedProxy: Boolean): EffectiveDns =
+      when {
+        !c.enabled -> EffectiveDns(DnsEffect.DISABLED, null)
+        c.rules.none { problem(it) == null } -> EffectiveDns(DnsEffect.NO_VALID_RULES, null)
+        // Paused deliberately: the mesh engine's own UDP lookups use protected sockets that
+        // bypass the proxy, so applying these servers would leak DNS around it.
+        forcedProxy -> EffectiveDns(DnsEffect.PAUSED_FORCED_PROXY, null)
+        else -> pick(c, net)?.let { EffectiveDns(DnsEffect.ACTIVE, it) } ?: EffectiveDns(DnsEffect.NO_MATCH, null)
+      }
 
   fun needsSsid(c: PerNetworkDnsConfig): Boolean = c.enabled && c.rules.any { it.match == DnsMatch.WIFI_SSID }
 

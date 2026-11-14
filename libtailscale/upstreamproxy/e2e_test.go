@@ -287,3 +287,70 @@ func TestI2PClearnetOnlyViaExplicitOutproxy(t *testing.T) {
 		t.Fatalf("outproxy saw %v", ts)
 	}
 }
+
+// A policy change rebuilds the TUN, which closes the userspace stack.
+// Established flows must not survive it: their outside sockets close.
+func TestStackCloseTearsDownEstablishedFlows(t *testing.T) {
+	// A server that holds the upstream connection open and reports when it ends.
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	defer ln.Close()
+	ended := make(chan struct{})
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		io.Copy(io.Discard, c) // returns when the proxy side closes
+		close(ended)
+	}()
+	h, port := hostPort(t, ln.Addr().String())
+	d := Dialer{Cfg: Config{Kind: KindSOCKS5, Host: h, Port: port, FailClosed: true}, Quiet: true}
+	socks := startSOCKS(t, "", "", map[string]string{"198.51.100.9:80": ln.Addr().String()})
+	sh, sp := hostPort(t, socks.addr)
+	d.Cfg.Host, d.Cfg.Port = sh, sp
+	ph := newPhone(t, func(uint8, netip.AddrPort, netip.AddrPort) FlowDialer { return d })
+	c, err := ph.dial(t, netip.MustParseAddrPort("198.51.100.9:80"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	io.WriteString(c, "hello\n") // flow is live end to end
+	time.Sleep(200 * time.Millisecond)
+	ph.st.Close() // policy change
+	select {
+	case <-ended:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the upstream socket of an established flow outlived the stack")
+	}
+	ph.st.Close() // idempotent
+}
+
+// Backend restart recovery: the dialer holds no sticky "down" state, so
+// once the Tor service is back the very next flow works, and while it
+// is down every flow is refused (never direct).
+func TestTorBackendRestartRecovery(t *testing.T) {
+	web := echoServer(t)
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	addr := ln.Addr().String()
+	ln.Close() // Tor is not running yet
+	h, port := hostPort(t, addr)
+	d := Dialer{Cfg: Config{Kind: KindSOCKS5, Host: h, Port: port, FailClosed: true, Backend: BackendTor}, Quiet: true}
+	for i := 0; i < 2; i++ {
+		if _, err := d.DialTCP(ctx3(t), web); StageOf(err) != StageReach {
+			t.Fatalf("while down: %v", err)
+		}
+	}
+	// "Restart" Tor on the same port.
+	ln2, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Skipf("port reuse: %v", err)
+	}
+	ln2.Close()
+	socks := startSOCKSOn(t, addr, map[string]string{})
+	_ = socks
+	c, err := d.DialTCP(ctx3(t), web)
+	if err != nil {
+		t.Fatalf("no recovery after restart: %v", err)
+	}
+	c.Close()
+}
