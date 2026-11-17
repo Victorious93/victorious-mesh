@@ -1,295 +1,94 @@
-<!-- victorious-fleet-readme-refresh:start -->
-<p align="center">
-  <img src="assets/logo.png" alt="Victorious Mesh logo" width="200">
-</p>
+<div align="center">
+
+<img src="docs/assets/banner.png" alt="Victorious Mesh — Part of the Victorious Framework fleet" width="1280" />
 
 # Victorious Mesh
 
-Secure mesh-networking / VPN Android app for the fleet.
-
-**Package id:** `com.victorious.mesh`
-
-**Status:** CI green *(from [fleet-manifest ROADMAP](https://github.com/Victorious93/fleet-manifest/blob/main/ROADMAP.md))*
-
-## Install / build
-
-Android Gradle under `android/` (`android/build.gradle.kts`). Typical: `cd android && ./gradlew assembleDebug` if wrapper present.
-
-_Steps above are taken from this repo’s build files / existing docs; anything not exercised in this refresh is unlabeled as verified on a device._
-
-## Victorious fleet
-
-- Monorepo: [https://github.com/Victorious93/victorious-fleet](https://github.com/Victorious93/victorious-fleet)
-- Fleet site: [https://victorious-framework.pages.dev](https://victorious-framework.pages.dev)
-
-<!-- victorious-fleet-readme-refresh:end -->
-
-Victorious Mesh is a secure mesh-networking / VPN app for Android
-(`com.victorious.mesh`). It connects your phone to Don's private network, run by a
-self-hosted [Headscale](https://headscale.net) control server.
-
-> **Testing status:** builds and JVM unit tests pass locally and in CI. Nothing has been
-> tested on a real device or against a real Headscale server yet.
-
-## What it is
-
-- A Tailscale/WireGuard-based client. It is a fork of the open-source
-  [tailscale-android](https://github.com/tailscale/tailscale-android) app
-  (BSD-3-Clause + PATENTS; credited in `NOTICE`, see also `LICENSE`, `PATENTS`).
-- It owns the **one** Android `VpnService` for the whole fleet. Android allows only one
-  VPN at a time, so other fleet apps go through this one rather than running their own.
-- Point it at your server in **Settings → Control server**, e.g.
-  `https://headscale.example.com`. The server **must be HTTPS on port 443**. There is no
-  default server.
-- Log in interactively, or with a **pre-auth key**
-  (`headscale preauthkeys create --user USER`) on the same screen.
-- Diagnostic log upload to Tailscale is permanently disabled.
-- ABIs: arm64-v8a and armeabi-v7a.
-
-## User manual
-
-The full user guide is [docs/MANUAL.md](docs/MANUAL.md). The same document is bundled
-into the app: open **Help** from the main screen, or **Settings → Help / Manual**.
-Screenshot files are placeholders until they are captured (`images/manual/*.png`).
-
-## Where it fits in the fleet
-
-Victorious Mesh is an **EXTERNAL_NODE**. The fleet controller app
-**droidcommand-AI** (`ai.droidcommand.app`) drives it:
-
-- **Transport:** an Android Messenger bridge, intent action
-  `com.victorious.mesh.action.BRIDGE` (package `com.victorious.mesh`).
-- **Protocol:** the shared fleet JSON envelope, `protocol_major` 1, `protocol_minor` 1
-  (remote-control envelope plus backward-compatible `mesh.*` ops).
-- **Pairing:** by package name + signing-certificate SHA-256, checked on this side.
-  Mesh does **not** share a signing key with the controller.
-- **Allowlist:** `ai.droidcommand.app` and `ai.droidcommand.app.debug` (full
-  access), each pinned to two certs: the droidcommand-AI debug cert
-  (`88:00:51:A6:…:A0:C8:4D`) and the shared fleet release cert
-  (`9E:A7:B3:14:…:F7:2D:8D`). **Victorious Browser** (`com.victorious.browser`)
-  is a read-only consumer: `mesh.status` and `mesh.ip` / `mesh.ip.get` only
-  (debug cert pinned; release TBD). Full values in
-  [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md). Mesh's own signing keys are separate.
-- Each install has a permanent node id: `mesh-` + 32 lowercase hex characters.
-
-### Operations
-
-| Operation | What it does |
-|---|---|
-| `mesh.capabilities.get` / `capabilities.get` | Lists supported operations. Envelope form returns `{name, kind, remoteAllowed, requiresConfirm}` per op. Allowed even when the Settings switch is off. |
-| `mesh.status` | Connection state, control server URL, mesh IPs |
-| `mesh.up` | Turns the mesh on (refused until the user has opened the app once and approved the VPN) |
-| `mesh.down` | Turns the mesh off. Via `remote.command` this is destructive and needs an on-phone tap. |
-| `mesh.ip.get` | This phone's mesh IPv4 / IPv6 |
-| `node.status.get` | Status-tray snapshot (canonical `BridgeRequest` + envelope fields in `parameters`). mesh / vpn / node_health. No keys or IPs. |
-| `config.export` / `config.import` | This app's non-secret settings snapshot / restore (standalone `BridgeRequest`). Import needs on-phone confirm; never enables remote control. |
-| `remote.command` / `macro.step` / `macro.run` | Envelope v1.1: dispatch a mesh action, or run steps (honour `onError`; `dryRun` validates only) |
-
-**External control is OFF by default.** To turn it on, open the app, go to **Settings**,
-and switch on **Allow fleet controller (droidcommand-AI)**.
-Full details, errors and examples: [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md).
-
-## WireGuard profiles
-
-How to import and use a standard WireGuard tunnel instead of the mesh:
-
-1. Open **Settings → WireGuard**.
-2. Add a profile:
-   - **Import .conf** — pick a wg-quick file from the system picker, or
-   - **Paste** — paste the `[Interface]` / `[Peer]` text, or
-   - **QR image** — pick a screenshot or photo of a WireGuard QR code.
-3. Rename or delete profiles from the card if you need to.
-4. Tap **Connect**. Approve the Android VPN permission if asked. The card at the
-   top shows **WireGuard · profile name** and **Connected**. The main screen also
-   shows a banner while this mode is up.
-5. Tap **Disconnect** to stop the tunnel, or **Switch back to mesh mode** to
-   return the app to the mesh. Connecting the mesh from the main screen also
-   turns WireGuard off first.
-
-**One tunnel at a time.** Android allows one VPN per app. Mesh and WireGuard
-never run together.
-
-**What is used from the config:** `PrivateKey` (base64 or 64-character hex),
-`Address`, `DNS` (IPs become DNS servers, names become search domains), `MTU`
-(default 1280), `ListenPort`, and per peer `PublicKey`, `PresharedKey`,
-`AllowedIPs` (installed as routes; at least one is required), `Endpoint` (host
-names are resolved when connecting) and `PersistentKeepalive`. Linux-only
-wg-quick keys (`PostUp`, `Table`, `FwMark`, …) are ignored. A full-tunnel config
-(`AllowedIPs = 0.0.0.0/0` or `::/0`) with no `DNS` gets Cloudflare public DNS
-so lookups are not sent into an empty resolver.
-
-**Keys:** the whole config, including the private key, is stored only in the
-app's EncryptedSharedPreferences (AES-256-GCM, master key in the Android
-Keystore). Keys are never logged and never included in error messages.
-
-**Fleet bridge:** no new operations. While WireGuard mode is active, `mesh.status`
-reports the mesh as down (`connected: false`, no mesh IPs) and `mesh.up` is
-refused until the user switches back to mesh mode in the app.
-
-**How it works:** WireGuard runs inside the app's existing Go core using
-`github.com/tailscale/wireguard-go` (MIT), on the same VpnService the mesh uses.
-No second Go runtime and no extra native library is added.
-
-## Proxy
-
-**Settings → Proxy.** Off by default. **[not device-verified]**
-
-**Share this phone:** other mesh nodes can use this phone as an HTTP CONNECT
-or SOCKS5 exit. One port (default 1080) serves both, using the mesh engine's
-built-in userspace listeners. The bind address is this node's mesh IPv4 only
-— never `0.0.0.0`, Wi-Fi, or cellular. Optional username/password live in
-EncryptedSharedPreferences. A persistent notification stays up while it
-runs. WireGuard mode turns it off.
-
-**Upstream:** HTTP on Android 10+ can still use advisory `setHttpProxy`
-(apps may ignore it). **Force all traffic** (off by default) is a
-TUN-to-SOCKS5/HTTP-CONNECT path in libtailscale: TCP goes through the
-proxy with credentials; public DNS uses SOCKS5 UDP ASSOCIATE or DNS
-over TCP (mesh / MagicDNS stays on the mesh; fail-closed if the proxy
-is down); IPv6 goes through the proxy when the upstream supports it,
-otherwise IPv6 is blocked and is never leaked on the underlay; UDP uses
-SOCKS5 UDP ASSOCIATE or is blocked; fail-closed blocks flows if the
-proxy drops. Literal non-mesh proxy IPs are excluded from the VPN to
-avoid a loop. Status is shown on the Proxy screen. **[not device-verified]**
-
-**Proxy kinds.** HTTP CONNECT, **HTTPS CONNECT** (verified TLS to the
-proxy: wrong-name, unknown-CA and expired certificates fail and are never
-retried in plaintext; verification cannot be disabled), SOCKS5 (host names
-passed to the proxy) and **I2P SAM**. Remote proxy ports are 1–65535 (only
-the port you *share* keeps 1024+). Saved proxies can be duplicated, edited,
-imported from a URI (`socks5://user:pass@[2001:db8::1]:1080`) and copied
-without secrets. A **Test connection** button reports reachability / TLS /
-authentication / negotiation / forwarding separately. HTTP is advisory on
-Android 10+; HTTPS, SOCKS5 and SAM are enforced only with **Force all
-traffic**. **[not device-verified]**
-
-**Tor** (external service — Orbot in SOCKS-only mode, or `tor` on a mesh
-node; not embedded) and **I2P** (your router's SAM bridge): selected TCP is
-forwarded by name, `.onion` (v3, checksum-verified) and `.i2p` DNS queries
-are answered on the phone with virtual addresses and **never reach any DNS
-server**, Tor/I2P never fall back to a direct connection, UDP is blocked,
-and an unavailable backend means blocked, not leaked. Clearnet through I2P
-needs an explicit outproxy. No bootstrap/circuit telemetry is shown (it
-would need Tor's ControlPort, which is not wired up). See the manual.
-**[not device-verified; no live Tor/I2P network was used]**
-
-**DNS tools** (Settings → DNS tools): A/AAAA/CNAME/MX/NS/TXT/SOA/PTR/SRV/CAA
-and reverse lookups over UDP, TCP, **DoT** and **DoH** (certificates always
-verified, no plaintext fallback, hostname resolvers need bootstrap IPs and
-are never resolved with other DNS), explicit routes (direct / mesh / proxy /
-Tor that never silently reroute), TTL-aware positive and negative cache,
-resolver comparison and latency, honest DNSSEC reporting (resolver claim
-vs. no local validation), local host mappings and allow/block rules, bounded
-opt-in history, copy/export. Private, `.local`, `.onion` and `.i2p` names
-never reach public resolvers. Mesh DNS config (Headscale routes, private
-zones, search domains) is not modified by the tools. **[not device-verified]**
-
-**Per-network DNS under the forced proxy** is deliberately *not applied*
-(applying it would let DNS bypass the proxy); the screen now says so
-instead of looking active.
-
-**Fleet bridge:** no new operations. The Orchestrator must ratify any later
-remote control.
-
-## Per-app routing
-
-**Settings → Per-app routing.** **[not device-verified]**
-
-**Feasible:** **Direct** (bypass VPN) vs **Mesh** via
-`addDisallowedApplication` / the existing split-tunnel lists.
-
-**Not per-app on one tunnel:** **Exit node** and **Upstream proxy** are
-device-wide. The UI can remember a choice; those apps still use the single
-mesh/exit/proxy.
-
-**IP/location check:** on-demand GET to a configurable JSON endpoint. Runs
-from this app, so it is not a true per-app vantage point for Direct apps.
-
-**Traffic:** not tracked (would need usage-access). No GPS spoofing. No new
-fleet operations.
-
-## Kill switch
-
-**Settings → Kill switch.** Off by default. **[not device-verified]**
-
-When the mesh or WireGuard has been started, an unexpected drop holds a
-blocking VPN (documentation-range dummy addresses) and reconnects.
-Turning the main switch or Quick Settings tile off is an explicit leave.
-Android Always-on VPN plus “Block connections without VPN” is the
-stronger system lock. Another app taking the VPN slot cannot be held.
-Direct apps still bypass. No new fleet operations.
-
-## Auto-connect
-
-**Settings → Auto-connect.** Off by default. **[not device-verified]**
-
-Starts the last tunnel (mesh or the last WireGuard profile) when the
-app opens or the phone finishes booting, if VPN permission was already
-granted. Android 12+ may block a start from boot. Always-on VPN is
-more reliable. No start before first unlock. No new fleet operations.
-
-## Leak checker
-
-**Settings → Leak checker.** Off by default (on-demand only).
-**[not device-verified]**
-
-Every line is tagged **settings**, **observed** or **verified**.
-Configuration (VPN, kill switch, proxy fail-open, ignored per-network DNS,
-Tor/I2P down, Direct apps) can never be "verified". A public IP is observed
-for this app only and says nothing about DNS. DNS is only **verified** by
-the observation test (a unique name under a zone you control, plus an
-https results endpoint that says which resolvers asked); with no service,
-or if the service never saw the query, the result is **inconclusive**, never
-passed, and the headline says it is not a clean bill of health. Other apps'
-own encrypted DNS, WebRTC/STUN and pre-VPN sockets are out of scope. No
-fleet operations.
-
-## VictorGPS stub
-
-**Settings → VictorGPS stub.** Off by default. **[not device-verified]**
-
-Local room profile only (lat/lng + optional target-app package). Does
-not mock GPS. `com.victorious.gps` is **not** on the fleet allowlist.
-Debug cert SHA-256 recorded from victorgps PR #1; release TBD. No new
-fleet operations.
-
-## Tiles & widget
-
-**Settings → Tiles & widget.** Off by default. **[not device-verified]**
-
-The original Quick Settings tile still toggles the VPN. This switch
-offers a kill-switch tile, a mesh-proxy tile, a status tile, and a
-home-screen widget. You still add them from Quick Settings or the
-widget picker. No new fleet operations.
-
-## Mesh speed / health
-
-**Settings → Mesh speed / health.** On-demand only.
-**[not device-verified]**
-
-Snapshots mesh grade (OK / degraded / down), peer path mix (direct vs
-relay), lifetime tunnel transfer, backend health warnings, and one
-disco ping to the first online IPv4 peer. Not an internet speed test.
-WireGuard mode reports mesh down. No new fleet operations.
-
-## Fleet theme
-
-VictorLaunch is the source of truth (`FLEET_THEME` schemaVersion 1).
-**[not device-verified]**
-
-This app queries `content://com.victorious.launch.theme/current` on
-start, registers a `ContentObserver`, and an exported receiver for
-`com.victorious.launch.action.FLEET_THEME_CHANGED`. `palette.*` is
-applied live in Compose. VictorLaunch is authenticated by package +
-signing-cert pin (`com.victorious.launch`, debug cert
-`B9:9A:AF:E2:…:4E:4A:69`). The signature permission is not used as
-auth. On `SecurityException`, an unpinned provider, or any
-`schemaVersion` other than 1, the built-in neon theme stays. This app
-never writes the provider. No new fleet operations.
-
-## Build and run
-
-You need Go (version in `go.mod`), gomobile (the build script installs it), JDK 17+, Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
+**Secure mesh-networking VPN for Android, on your own Headscale server.**
+
+Works on its own; fleet integration (droidcommand-AI) is optional
+
+<p>
+  <a href="https://github.com/Victorious93/victorious-mesh/releases"><img src="https://img.shields.io/github/v/release/Victorious93/victorious-mesh?include_prereleases&style=flat-square&label=Release&labelColor=0B0F1A&color=00E5FF" alt="Latest release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-BSD--3--Clause-FF2BD6?style=flat-square&labelColor=0B0F1A" alt="License: BSD-3-Clause" /></a>
+  <a href="https://github.com/Victorious93/victorious-mesh/actions/workflows/android.yml"><img src="https://img.shields.io/github/actions/workflow/status/Victorious93/victorious-mesh/android.yml?branch=main&style=flat-square&label=Android%20CI&labelColor=0B0F1A&color=00E5FF" alt="Android CI" /></a>
+  <a href="https://victorious-framework.pages.dev"><img src="https://img.shields.io/badge/Fleet-Victorious_Framework-FF2BD6?style=flat-square&labelColor=0B0F1A" alt="Victorious Framework fleet" /></a>
+</p>
+
+</div>
+
+Victorious Mesh (`com.victorious.mesh`) connects your Android phone to a private
+mesh network run by your own self-hosted [Headscale](https://headscale.net) control
+server. There is no default server and no account with anyone else.
+
+> **Testing status:** builds and JVM unit tests pass in CI. Nothing has been tested on a
+> real device or against a real Headscale server yet, so every feature below is
+> **[not device-verified]**.
+
+## Features
+
+Everything optional is **off by default**. Each item is described in the
+[manual](docs/MANUAL.md).
+
+- **Mesh VPN** to your Headscale server (Settings → Control server, HTTPS on port 443),
+  with interactive login or a pre-auth key. Device list with search, pinning, ping and
+  copy-address. Exit nodes, MagicDNS / split DNS, subnet routes and Mesh Drop file transfer.
+- **WireGuard mode:** import a standard `.conf` (file, paste or QR image) and use it
+  instead of the mesh. One tunnel at a time.
+- **Kill switch** and **auto-connect**.
+- **Proxy:** share this phone as an HTTP CONNECT / SOCKS5 exit on its mesh address
+  only, or **force all traffic** through an upstream HTTP, HTTPS, SOCKS5, Tor or I2P
+  proxy (fail-closed by default, DNS included).
+- **Per-app routing:** each app can use the normal route, the exit node, its own saved
+  proxy, or go Direct, with "block if its path is down".
+- **DNS:** per-network DNS (by Wi-Fi name or mobile data) and **DNS tools** (lookups
+  over UDP, TCP, DNS over TLS and DNS over HTTPS with verified certificates).
+- **Leak checker** that labels every result as settings, observed or verified, and
+  never reports a pass it didn't measure.
+- **Mesh file share** (read-only, password-protected, mesh address only),
+  **remote shell** shortcut (SSH app or Termux, no stored passwords) and
+  **Wake-on-LAN**.
+- **Connection log** (local, size-capped, no IP addresses), **battery saver**,
+  **mesh speed / health** page, extra **Quick Settings tiles** and a home-screen widget.
+- **Launcher shortcuts** for VictorLaunch: connect and disconnect, always behind an
+  on-phone confirm dialog.
+- **Privacy:** diagnostic log upload is permanently disabled; keys and saved
+  credentials stay in encrypted storage on the phone; Android backup is off.
+- **Fleet integration (optional):** droidcommand-AI can control the mesh over a
+  Messenger bridge, but **only after you switch it on** in Settings. Callers are
+  pinned by package and signing certificate, and destructive actions need a tap on the
+  phone. Details: [docs/FLEET_BRIDGE.md](docs/FLEET_BRIDGE.md). The fleet theme from
+  VictorLaunch is used when present; otherwise the built-in neon theme stays.
+
+## Screenshots
+
+No screenshots have been captured yet. Real ones will be added after testing on a
+device; none of the images in this repo are app screenshots.
+
+## Install / download
+
+**Debug pre-release, not finished software.** It is signed with this repo's public
+debug key. Install it only if you understand the risk.
+
+- Release: [v0.1.0-debug](https://github.com/Victorious93/victorious-mesh/releases/tag/v0.1.0-debug)
+  (pre-release, published 2026-10-30)
+- APK: [`victorious-mesh-debug.apk`](https://github.com/Victorious93/victorious-mesh/releases/download/v0.1.0-debug/victorious-mesh-debug.apk)
+  (about 69 MB; arm64-v8a and armeabi-v7a)
+
+> **This APK is older than the feature list above.** It was built from commit
+> `7e85ccd` (2026-10-27). Everything merged after that is **not** in it, including
+> the hardened fleet receiver, per-app exit node / proxy choice, mesh file share,
+> remote shell, Wake-on-LAN, per-network DNS, connection log, battery saver, launcher
+> shortcuts, HTTPS / Tor / I2P proxies, DNS tools and the forced-proxy DNS fix.
+> For those, use a newer CI build: every run of
+> [Android CI](https://github.com/Victorious93/victorious-mesh/actions/workflows/android.yml)
+> uploads a **`victorious-mesh-debug-apk`** artifact (needs a GitHub login), or build
+> from source.
+
+## Build from source
+
+You need Go (the version in `go.mod`), gomobile (the build script installs it),
+JDK 17+, the Android SDK (platform 36, build-tools 36.0.0) and NDK r26.
 
 ```sh
 export ANDROID_HOME=/path/to/android-sdk
@@ -300,51 +99,29 @@ cd android
 ./gradlew testDebugUnitTest                # JVM unit tests
 ```
 
-Or skip the local build: every CI run uploads the debug APK as the
-**`victorious-mesh-debug-apk`** artifact on the GitHub Actions run page.
+Debug builds are signed with the fixed debug keystore committed at
+`android/keystore/victorious-mesh-debug.jks`, so local and CI builds match. Release
+keys are supplied only through CI secrets and are never committed.
 
-## Versioning
+Package ids, versioning, signing fingerprints and other technical details are in
+[docs/REFERENCE.md](docs/REFERENCE.md).
 
-`versionName` / `versionCode` are inherited from upstream Tailscale
-(`tailscale.com/cmd/mkversion` writes `tailscale.version`; Gradle reads
-`VERSION_LONG`). This is an **allowed fork exception**: Victorious Mesh does
-not keep a separate version scheme. The Play/install `applicationId` remains
-`com.victorious.mesh` and is not inherited.
+## Manual
 
-## Android packages (fleet audit)
+The full user guide is [docs/MANUAL.md](docs/MANUAL.md). The same text is built into
+the app: open **Help** from the main screen, or **Settings → Help / Manual**.
 
-| What | Value | Notes |
-|---|---|---|
-| `applicationId` | `com.victorious.mesh` | Play / install id for debug and release. **Never change this.** |
-| Gradle `namespace` | `com.victorious.mesh` | `R` and `BuildConfig` are generated here. |
-| Kotlin/Java source package | `com.tailscale.ipn.*` | **Deferred.** See below. |
-| Fleet bridge action | `com.victorious.mesh.action.BRIDGE` | Frozen string. |
+## License
 
-### Why the Kotlin package was not moved
+BSD-3-Clause, with the upstream patent grant. See [LICENSE](LICENSE),
+[PATENTS](PATENTS) and [NOTICE](NOTICE).
 
-A full `com.tailscale.ipn` → `com.victorious.mesh` source move is deferred:
+## Credits
 
-- The Go core is bound with gomobile as Java package `libtailscale` (see
-  `scripts/build-aar.sh`). `App` implements `libtailscale.AppContext`. The Go
-  side comments on `com.tailscale.ipn.App` as the app context; there is no
-  `FindClass("com/tailscale/ipn/...")`, but renaming hundreds of Kotlin/Java
-  files risks a silent interface / JNI break and a large upstream-merge
-  conflict with tailscale-android.
-- Manifest components use fully qualified `com.tailscale.ipn.*` names so they
-  stay valid after the Gradle namespace change. There is no `FileProvider` /
-  `android:authorities` that needs `${applicationId}`.
-
-Safe in this change: Gradle `namespace`, `R` / `BuildConfig` imports, FQCN
-manifest names, ProGuard keep for `com.victorious.mesh.R` / `BuildConfig`.
-The committed debug keystore is unchanged; no release keys are added.
-
-## Signing
-
-- **Debug:** a fixed, committed debug key, so every build (local and CI) has the same
-  signature: `android/keystore/victorious-mesh-debug.jks`, alias `victoriousmeshdebug`,
-  SHA-256
-  `F4:C9:25:B8:E8:0B:55:AB:83:E6:04:13:EE:49:86:57:DF:85:03:BB:30:D8:1F:9F:17:43:F2:2B:F5:36:B9:F4`.
-- **Release:** the app's **own** release key, supplied only through CI secrets via
-  `VM_RELEASE_STORE_FILE`, `VM_RELEASE_STORE_PASSWORD`, `VM_RELEASE_KEY_ALIAS` and
-  `VM_RELEASE_KEY_PASSWORD`. It is not the shared fleet key and is never committed.
-  (Whether those secrets are configured in the repo yet hasn't been checked: [Guessing].)
+Victorious Mesh is a Victorious Framework fork of
+[tailscale/tailscale-android](https://github.com/tailscale/tailscale-android), with the
+Go core from [tailscale/tailscale](https://github.com/tailscale/tailscale) and
+WireGuard from `github.com/tailscale/wireguard-go` (MIT). The upstream copyright and
+license are kept in [LICENSE](LICENSE), [PATENTS](PATENTS) and [NOTICE](NOTICE).
+This project is not affiliated with or endorsed by the upstream authors. Upstream
+trademarks and product names remain their owners'.
