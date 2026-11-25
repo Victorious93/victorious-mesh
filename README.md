@@ -111,6 +111,14 @@ Package ids, versioning, signing fingerprints and other technical details are in
 The full user guide is [docs/MANUAL.md](docs/MANUAL.md). The same text is built into
 the app: open **Help** from the main screen, or **Settings → Help / Manual**.
 
+## Victorious fleet
+
+Victorious Mesh is part of the [Victorious Framework](https://victorious-framework.pages.dev), a family of Android and PC tools by Don Victor. **It works standalone; fleet integrations are optional.** Related: [droidcommand-AI](https://github.com/Victorious93/droidcommand-AI), [victorlaunch](https://github.com/Victorious93/victorlaunch), [victorious-browser](https://github.com/Victorious93/victorious-browser). The roster is in [victorious-fleet](https://github.com/Victorious93/victorious-fleet) and live status is in [fleet-manifest](https://github.com/Victorious93/fleet-manifest).
+
+## Contributing
+
+Issues and pull requests are welcome. Please describe what you changed and why, and keep documentation accurate to the code — do not invent features, builds, or test results.
+
 ## License
 
 BSD-3-Clause, with the upstream patent grant. See [LICENSE](LICENSE),
